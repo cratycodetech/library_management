@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "279524558209",
+    "project_id": "message-notification-830cc",
+    "storage_bucket": "message-notification-830cc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:279524558209:android:4df5faf58a3eaf69cfd480",
+        "android_client_info": {
+          "package_name": "com.example.library_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "279524558209-pq2bfn8525h0bjiijrhfrejcu042ch46.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.library_app",
+            "certificate_hash": "1cea2905393ff2b3bae05bb73bea9fa6ea1d6514"
+          }
+        },
+        {
+          "client_id": "279524558209-164khgvpgbod89u8sgim00p8v3tcqrju.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCCNF96wUyHgIrNMh_ijBOGuGXb9uMNegw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "279524558209-164khgvpgbod89u8sgim00p8v3tcqrju.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
