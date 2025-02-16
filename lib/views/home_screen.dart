@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:library_app/views/widgets/bottomNavigationBar_widget.dart';
 import '../controllers/auth_controller.dart';
+import '../routes/routes.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   final AuthController authController = Get.find();
+  int _currentIndex = 0; // Default index for BottomNavBar
 
   @override
   Widget build(BuildContext context) {
@@ -26,18 +34,37 @@ class HomeScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircleAvatar(
-                  backgroundImage: NetworkImage(authController.userModel.value!.photoURL),
+                  backgroundImage:
+                  NetworkImage(authController.userModel.value!.photoURL),
                   radius: 40,
                 ),
                 SizedBox(height: 10),
                 Text(authController.userModel.value!.name),
                 Text(authController.userModel.value!.email),
+                ElevatedButton(
+                  onPressed: () {
+                    Get.toNamed(AppRoutes.createGroup);
+                  },
+                  child: Text("Create Group"),
+                ),
               ],
             );
           } else {
             return Text("No user logged in");
           }
         }),
+      ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+
+          if (index == 2) { // Group tab index
+            Get.toNamed(AppRoutes.groupList);
+          }
+        },
       ),
     );
   }
