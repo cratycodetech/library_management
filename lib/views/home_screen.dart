@@ -21,17 +21,17 @@ class HomeScreen extends StatelessWidget {
       ),
       body: Center(
         child: Obx(() {
-          if (authController.firebaseUser.value != null) {
+          if (authController.userModel.value != null) {
             return Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircleAvatar(
-                  backgroundImage: NetworkImage(authController.firebaseUser.value!.photoURL ?? ""),
+                  backgroundImage: NetworkImage(authController.userModel.value!.photoURL),
                   radius: 40,
                 ),
                 SizedBox(height: 10),
-                Text(authController.firebaseUser.value!.displayName ?? ""),
-                Text(authController.firebaseUser.value!.email ?? ""),
+                Text(authController.userModel.value!.name),
+                Text(authController.userModel.value!.email),
               ],
             );
           } else {
