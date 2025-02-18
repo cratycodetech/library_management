@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import '../views/create_group_screen.dart';
+import '../views/group_call_screen.dart';
 import '../views/group_chat_screen.dart';
 import '../views/group_list_screen.dart';
 import '../views/home_screen.dart';
@@ -15,6 +16,7 @@ class AppRoutes {
   static const String createGroup = '/create-group';
   static const String groupChat = '/group-chat';
   static const String groupList = '/group-list';
+  static const String groupCall = '/group-call';
 
   static List<GetPage> pages = [
     GetPage(
@@ -44,6 +46,17 @@ class AppRoutes {
     GetPage(
       name: groupList,
       page: () => GroupListScreen(),
+    ),
+
+    GetPage(
+      name: groupCall,
+      page: () {
+        final args = Get.arguments as Map<String, dynamic>? ?? {};
+        return GroupCallScreen(
+          channelName: args["channelName"] ?? "Unknown",
+          token: args["token"] ?? "",
+        );
+      },
     ),
   ];
 }

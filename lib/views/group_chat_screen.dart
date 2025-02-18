@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/agora_service.dart';
 import '../services/group_service.dart';
+import '../views/group_call_screen.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final String groupId;
   final String groupName;
 
-  // Add a constructor to accept groupId and groupName
   GroupChatScreen({required this.groupId, required this.groupName});
 
   @override
@@ -19,25 +20,87 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final GroupService _groupService = GroupService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  late String groupId;
-  late String groupName;
+  final AgoraService _agoraService = AgoraService();
+  bool isCallActive = false;
+  String? activeCallToken;
 
   @override
   void initState() {
     super.initState();
-    final Map<String, dynamic> args = Get.arguments ?? {};
-    groupId = args['groupId'] ?? 'Unknown';
-    groupName = args['groupName'] ?? 'Unnamed Group';
+    _listenForActiveCall();
   }
 
+  /// 🔴 Listen for active call status in Firestore
+  void _listenForActiveCall() {
+    FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.groupId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        setState(() {
+          isCallActive = snapshot.data()?['isCallActive'] ?? false;
+          activeCallToken = snapshot.data()?['callToken'];
+        });
+      }
+    });
+  }
+
+  void _startCall() async {
+    DocumentReference groupRef = FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+
+    DocumentSnapshot snapshot = await groupRef.get();
+    String? activeToken = snapshot.exists ? snapshot['callToken'] : null;
+
+    if (activeToken == null) {
+      activeToken = await _agoraService.generateToken(widget.groupId, 0);
+      print("🔹 Generating new Agora token: $activeToken");
+
+      await groupRef.set({
+        'isCallActive': true,
+        'callToken': activeToken,
+      }, SetOptions(merge: true));
+    } else {
+      print("🔹 Reusing existing token from Firestore: $activeToken");
+    }
+
+    Get.to(() => GroupCallScreen(channelName: widget.groupId, token: activeToken!));
+  }
+
+
+
+
+  void _joinCall() async {
+    DocumentSnapshot snapshot = await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.groupId)
+        .get();
+
+    if (snapshot.exists && snapshot['isCallActive'] == true) {
+      String activeToken = snapshot['callToken']; // ✅ Always use stored token
+      print("🔹 Fetching token from Firestore: $activeToken");
+
+      // Navigate to GroupCallScreen with the same token for all users
+      Get.to(() => GroupCallScreen(channelName: widget.groupId, token: activeToken));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("No active call found!")),
+      );
+    }
+  }
+
+
+
+
+  /// 📝 Send message
   void _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
+
 
     String userId = _auth.currentUser!.uid;
     String userName = _auth.currentUser!.displayName ?? "Unknown User";
 
-    await _groupService.sendMessage(groupId, userId, userName, _messageController.text.trim());
+    await _groupService.sendMessage(widget.groupId, userId, userName, _messageController.text.trim());
 
     _messageController.clear();
   }
@@ -45,20 +108,48 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(groupName)),
+      appBar: AppBar(
+        title: Text(widget.groupName),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.call, color: Colors.white),
+            onPressed: _startCall,
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          // Message List
+          // 🔔 Show Join Call Button if a call is active
+          if (isCallActive)
+            Container(
+              color: Colors.green[100],
+              padding: EdgeInsets.all(10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.call, color: Colors.green),
+                  SizedBox(width: 10),
+                  Text("A call is in progress"),
+                  SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: _joinCall,
+                    child: Text("Join Call"),
+                  ),
+                ],
+              ),
+            ),
+
+          // 📩 Message List
           Expanded(
             child: StreamBuilder(
-              stream: _groupService.getMessages(groupId),
+              stream: _groupService.getMessages(widget.groupId),
               builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
                 if (!snapshot.hasData) {
                   return Center(child: CircularProgressIndicator());
                 }
 
                 return ListView.builder(
-                  reverse: true, // Newest messages at the bottom
+                  reverse: true,
                   itemCount: snapshot.data!.docs.length,
                   itemBuilder: (context, index) {
                     var message = snapshot.data!.docs[index];
@@ -95,7 +186,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             ),
           ),
 
-          // Message Input Box
+          // ✏️ Message Input Box
           Padding(
             padding: EdgeInsets.all(8.0),
             child: Row(
