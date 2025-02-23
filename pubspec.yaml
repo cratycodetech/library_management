@@ -23,6 +23,19 @@ dependencies:
   agora_rtc_engine: ^6.5.0
   permission_handler: ^11.3.1
   http: ^1.2.2
+  file_picker: ^9.0.0
+  firebase_storage: ^12.4.3
+  url_launcher: ^6.3.1
+  supabase_flutter: ^2.8.3
+  uuid: ^4.5.1
+  syncfusion_flutter_pdfviewer: ^28.2.6
+  syncfusion_flutter_pdf: ^28.2.6
+  get_thumbnail_video: ^0.7.3
+  video_player: ^2.9.3
+  path_provider: ^2.1.5
+  flutter_downloader: ^1.12.0
+  flutter_quill: ^11.0.0
+  flutter_quill_extensions: ^11.0.0
 
 
 dev_dependencies:

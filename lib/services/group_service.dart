@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/group_model.dart';
+import 'package:get_thumbnail_video/index.dart';
+import 'package:get_thumbnail_video/video_thumbnail.dart';
+import 'package:path_provider/path_provider.dart';
+
 
 class GroupService {
   final CollectionReference groupsCollection =
@@ -51,25 +55,30 @@ class GroupService {
 
 
 
-
-
-
-
-
-
-
-  Future<void> sendMessage(String groupId, String userId, String userName, String text) async {
+  Future<void> sendMessage(
+      String groupId,
+      String userId,
+      String userName,
+      String text, {
+        String? fileUrl,
+        String? fileName,
+        String? fileType,
+      }) async {
     try {
       await groupsCollection.doc(groupId).collection('messages').add({
         'senderId': userId,
         'senderName': userName,
-        'text': text,
+        'text': text.isNotEmpty ? text : null,
+        'fileUrl': fileUrl,
+        'fileName': fileName,
+        'fileType': fileType,
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       print("Error sending message: $e");
     }
   }
+
 
   // Fetch messages for a group (real-time updates)
   Stream<QuerySnapshot> getMessages(String groupId) {
@@ -83,4 +92,22 @@ class GroupService {
   Stream<QuerySnapshot> getUserGroups(String userId) {
     return groupsCollection.where('members', arrayContains: userId).snapshots();
   }
+
+  Future<XFile?> generateThumbnail(String videoUrl) async {
+    try {
+      final Directory tempDir = await getTemporaryDirectory();
+      return await VideoThumbnail.thumbnailFile(
+        video: videoUrl,
+        thumbnailPath: tempDir.path,
+        imageFormat: ImageFormat.PNG,
+        maxHeight: 300, // adjust as needed
+        quality: 75, // adjust as needed
+      );
+    } catch (error) {
+      print("Error generating thumbnail: $error");
+      return null;
+    }
+  }
+
+
 }
