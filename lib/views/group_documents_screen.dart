@@ -48,7 +48,11 @@ class GroupDocumentsScreen extends StatelessWidget {
                     var doc = snapshot.data!.docs[index];
                     return ListTile(
                       title: Text(doc['title'] ?? 'Untitled Document'),
-                      subtitle: Text(doc['timestamp'].toDate().toString()),
+                      subtitle: Text(
+                          doc['timestamp'] != null
+                              ? doc['timestamp'].toDate().toString()
+                              : "No timestamp available"
+                      ),
                       onTap: () {
                         // Open the document for editing
                         Get.to(() => DocumentEditorScreen(
