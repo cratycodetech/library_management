@@ -81,12 +81,20 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             Expanded(
               child: _allUsers.isEmpty
                   ? Center(child: CircularProgressIndicator())
-                  : ListView.builder(
+                  :ListView.builder(
                 itemCount: _allUsers.length,
                 itemBuilder: (context, index) {
                   final user = _allUsers[index];
+                  bool isFile = user["isFile"] ?? false; // Assuming files have "isFile": true
+
                   return CheckboxListTile(
-                    title: Text(user["name"]),
+                    title: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: Text(user["name"])), // Ensures text takes available space
+                        if (isFile) Icon(Icons.arrow_forward, color: Colors.grey), // Forward icon
+                      ],
+                    ),
                     subtitle: Text(user["email"]),
                     value: _selectedUserIds.contains(user["uid"]),
                     onChanged: (bool? selected) {

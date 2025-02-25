@@ -5,16 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:get_thumbnail_video/video_thumbnail.dart';
 import 'package:library_app/views/widgets/video_message_widget.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:video_player/video_player.dart';
 import '../routes/routes.dart';
 import '../services/agora_service.dart';
 import '../services/file_upload_service.dart';
 import '../services/group_service.dart';
 import '../views/group_call_screen.dart';
 import 'group_documents_screen.dart';
+import 'package:path/path.dart' as p;  // Path package for extracting file name
+import 'package:http/http.dart' as http;  // HTTP package for downloading files
+import 'package:share_plus/share_plus.dart';  // Share package for sharing files
+
 
 class GroupChatScreen extends StatefulWidget {
   final String groupId;
@@ -45,14 +48,32 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   void _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.any,
+      allowMultiple: false,
     );
 
-    if (result != null) {
+    if (result != null && result.files.single.path != null) {
+      String absoluteFilePath = result.files.single.path!;
+      print("Absolute File Path: $absoluteFilePath");
+
       setState(() {
         _selectedFile = result;
       });
+    } else {
+      print("🚫 No file selected.");
     }
   }
+
+  void _forwardMessage(String fileUrl, String fileType, String fileName, String? text) {
+    Get.toNamed('/select-chat', arguments: {
+      'fileUrl': fileUrl,
+      'fileType': fileType,
+      'fileName': fileName,
+      'text': text,
+    });
+
+  }
+
+
 
   void _sendMessage() async {
     if (_messageController.text.trim().isEmpty && _selectedFile == null) return;
@@ -63,7 +84,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
     if (_selectedFile != null) {
       fileUrl = await FileUploadService()
-          .uploadFile(_selectedFile!.files.single.path!);
+          .uploadFile(userId);
       if (fileUrl == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("File upload failed!")),
@@ -154,6 +175,15 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       }
     });
   }
+
+  Future<void> _shareDownloadedFile(String fileUrl) async {
+    try {
+      await Share.share(fileUrl, subject: "Check out this file!");
+    } catch (e) {
+      print("Error sharing link: $e");
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -303,93 +333,152 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                         ),
                                       ] else ...[
                                         // Possibly a file message
-                                        if ((message['fileType'] ?? '')
-                                                .toLowerCase() ==
-                                            'pdf')
-                                          // Wrap PDF fileName in GestureDetector to open PDFViewer
-                                          GestureDetector(
-                                            onTap: () {
-                                              Get.toNamed('/pdf-viewer',
-                                                  arguments: {
-                                                    'pdfUrl':
-                                                        message['fileUrl'] ?? ''
-                                                  });
-                                            },
-                                            child: Text(
-                                              message['fileName'] ??
-                                                  'Unknown File',
-                                              style: TextStyle(
-                                                color: isMe
-                                                    ? Colors.white
-                                                    : Colors.black,
-                                                decoration:
-                                                    TextDecoration.underline,
+                                        if ((message['fileType'] ?? '').toLowerCase() == 'pdf')
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Expanded(
+                                                child: GestureDetector(
+                                                  onTap: () {
+                                                    Get.toNamed('/pdf-viewer', arguments: {
+                                                      'pdfUrl': message['fileUrl'] ?? ''
+                                                    });
+                                                  },
+                                                  child: Text(
+                                                    message['fileName'] ?? 'Unknown File',
+                                                    style: TextStyle(
+                                                      color: isMe ? Colors.white : Colors.black,
+                                                      decoration: TextDecoration.underline,
+                                                    ),
+                                                  ),
+                                                ),
                                               ),
-                                            ),
+                                              IconButton(
+                                                icon: Icon(Icons.arrow_upward, color: Colors.blue),
+                                                onPressed: () {
+                                                  _forwardMessage(
+                                                    message['fileUrl'],
+                                                    message['fileType'],
+                                                    message['fileName'],
+                                                    message['text'],
+                                                  );
+
+                                                },
+                                              ),
+                                              IconButton(
+                                                icon: Icon(Icons.share, color: Colors.blue), onPressed: () { _shareDownloadedFile(message['fileUrl']); },)
+                                            ],
                                           )
                                         else if ((message['fileType'] ?? '').toLowerCase() == 'jpg' ||
                                             (message['fileType'] ?? '').toLowerCase() == 'jpeg' ||
                                             (message['fileType'] ?? '').toLowerCase() == 'png')
-                                        // Wrap the image in a GestureDetector to handle taps
-                                          GestureDetector(
-                                            onTap: () {
-                                              // Navigate to the photo download page with the image URL as an argument
-                                              Get.toNamed(AppRoutes.photoDownload, arguments: {
-                                                'photoUrl': message['fileUrl'] ?? '',
-                                                // add more arguments if needed
-                                              });
-                                            },
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(10),
-                                              child: SizedBox(
-                                                width: 300,
-                                                height: 300,
-                                                child: Image.network(
-                                                  message['fileUrl'] ?? '',
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) => Container(
-                                                    color: isMe ? Colors.blueAccent : Colors.grey[300],
-                                                    width: 300,
-                                                    height: 300,
-                                                    child: Center(
-                                                      child: Text(
-                                                        'Image could not be loaded',
-                                                        style: TextStyle(
-                                                          color: isMe ? Colors.white : Colors.black,
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              GestureDetector(
+                                                onTap: () {
+                                                  Get.toNamed(AppRoutes.photoDownload, arguments: {
+                                                    'photoUrl': message['fileUrl'] ?? '',
+                                                  });
+                                                },
+                                                child: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  child: SizedBox(
+                                                    width: 150, // Adjust size if necessary
+                                                    height: 150,
+                                                    child: Image.network(
+                                                      message['fileUrl'] ?? '',
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context, error, stackTrace) => Container(
+                                                        color: isMe ? Colors.blueAccent : Colors.grey[300],
+                                                        width: 150,
+                                                        height: 150,
+                                                        child: Center(
+                                                          child: Text(
+                                                            'Image could not be loaded',
+                                                            style: TextStyle(
+                                                              color: isMe ? Colors.white : Colors.black,
+                                                            ),
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
-                                          )
+                                              IconButton(
+                                                icon: Icon(Icons.arrow_upward, color: Colors.blue),
+                                                onPressed: () {
+                                                  _forwardMessage(
+                                                    message['fileUrl'],
+                                                    message['fileType'],
+                                                    message['fileName'],
+                                                    message['text'],
+                                                  );
 
-                                        else if ((message['fileType'] ?? '')
-                                                .toLowerCase() ==
-                                            'mp4')
-                                          ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                            child: InlineVideoPlayer(
-                                              videoUrl:
-                                                  message['fileUrl'] ?? '',
-                                              thumbnailGenerator: _groupService
-                                                  .generateThumbnail,
-                                            ),
+
+                                                },
+                                              ),
+                                              IconButton(
+                                                icon: Icon(Icons.share, color: Colors.blue), onPressed: () { _shareDownloadedFile(message['fileUrl']); },)
+                                            ],
                                           )
-                                        else
-                                          // Other file types
-                                          Text(
-                                            message['fileName'] ??
-                                                'Unknown File',
-                                            style: TextStyle(
-                                              color: isMe
-                                                  ? Colors.white
-                                                  : Colors.black,
+                                        else if ((message['fileType'] ?? '').toLowerCase() == 'mp4')
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                ClipRRect(
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  child: InlineVideoPlayer(
+                                                    videoUrl: message['fileUrl'] ?? '',
+                                                    thumbnailGenerator: _groupService.generateThumbnail,
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  icon: Icon(Icons.arrow_upward, color: Colors.blue),
+                                                  onPressed: () {
+                                                    _forwardMessage(
+                                                      message['fileUrl'],
+                                                      message['fileType'],
+                                                      message['fileName'],
+                                                      message['text'],
+                                                    );
+                                                  },
+                                                ),
+                                                IconButton(
+                                                  icon: Icon(Icons.share, color: Colors.blue), onPressed: () { _shareDownloadedFile(message['fileUrl']); },)
+                                              ],
+                                            )
+                                          else
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    message['fileName'] ?? 'Unknown File',
+                                                    style: TextStyle(
+                                                      color: isMe ? Colors.white : Colors.black,
+                                                    ),
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  icon: Icon(Icons.forward, color: Colors.blue),
+                                                  onPressed: () {
+                                                    _forwardMessage(
+                                                      message['fileUrl'],
+                                                      message['fileType'],
+                                                      message['fileName'],
+                                                      message['text'],
+                                                    );
+
+                                                  },
+                                                ),
+                                                IconButton(
+                                                  icon: Icon(Icons.share, color: Colors.blue), onPressed: () { _shareDownloadedFile(message['fileUrl']); },)
+                                              ],
                                             ),
-                                          ),
                                       ],
+
                                     ],
                                   ),
                                 ),

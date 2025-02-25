@@ -1,10 +1,12 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
-import 'package:flutter_quill_extensions/flutter_quill_extensions.dart'; // ✅ Fix for missing FlutterQuillEmbeds
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill_extensions/flutter_quill_extensions.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../services/file_upload_service.dart';
 
 class DocumentEditorScreen extends StatefulWidget {
   final String groupId;
@@ -20,42 +22,31 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen> {
   final TextEditingController _titleController = TextEditingController();
   late quill.QuillController _quillController;
   bool _isLoading = true;
+  Timer? _debounceTimer;
+  StreamSubscription<DocumentSnapshot>? _docSubscription;
+  final FileUploadService fileUploadService = FileUploadService();
 
   @override
   void initState() {
     super.initState();
     _quillController = quill.QuillController.basic();
+    _quillController.addListener(_onDocumentChanged);
 
     if (widget.documentId != null) {
-      _loadDocument();
+      _subscribeDocument();
     } else {
-      setState(() => _isLoading = false);
+      _isLoading = false;
     }
   }
 
-  void _loadDocument() async {
-    DocumentSnapshot doc = await FirebaseFirestore.instance
-        .collection('groups')
-        .doc(widget.groupId)
-        .collection('documents')
-        .doc(widget.documentId)
-        .get();
-
-    if (doc.exists) {
-      setState(() {
-        _titleController.text = doc['title'] ?? '';
-
-        // Load document content from Firestore (stored as JSON)
-        if (doc['content'] != null) {
-          _quillController.document =
-              quill.Document.fromJson(jsonDecode(doc['content']));
-        }
-        _isLoading = false;
-      });
-    }
+  void _onDocumentChanged() {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(Duration(milliseconds: 500), () {
+      _saveDocumentRealtime();
+    });
   }
 
-  void _saveDocument() async {
+  void _saveDocumentRealtime() async {
     if (_titleController.text.trim().isEmpty) return;
 
     var docRef = FirebaseFirestore.instance
@@ -66,11 +57,79 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen> {
 
     await docRef.set({
       'title': _titleController.text.trim(),
-      'content': jsonEncode(_quillController.document.toDelta().toJson()), // Convert rich text to JSON
+      'content': jsonEncode(_quillController.document.toDelta().toJson()),
       'timestamp': FieldValue.serverTimestamp(),
     });
+  }
 
-    Navigator.pop(context);
+  void _subscribeDocument() {
+    _docSubscription = FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.groupId)
+        .collection('documents')
+        .doc(widget.documentId)
+        .snapshots()
+        .listen((docSnapshot) {
+      if (docSnapshot.exists) {
+        var data = docSnapshot.data() as Map<String, dynamic>;
+        if (data['content'] != null) {
+          final remoteDoc = quill.Document.fromJson(jsonDecode(data['content']));
+          final localJson = jsonEncode(_quillController.document.toDelta().toJson());
+          final remoteJson = jsonEncode(remoteDoc.toDelta().toJson());
+          if (localJson != remoteJson) {
+            _quillController.removeListener(_onDocumentChanged);
+            setState(() {
+              _quillController.document = remoteDoc;
+            });
+            _quillController.addListener(_onDocumentChanged);
+          }
+        }
+        if (data['title'] != null && data['title'] != _titleController.text.trim()) {
+          _titleController.text = data['title'];
+        }
+        if (_isLoading) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    });
+  }
+
+  Future<String?> _pickAndUploadImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return null;
+
+    // Upload the image and get the URL
+    String? imageUrl = await fileUploadService.uploadDocumentMediaFile(image.path);
+    return imageUrl;
+  }
+
+  void _insertImage() async {
+    String? imageUrl = await _pickAndUploadImage();
+    if (imageUrl != null) {
+      int index = _quillController.selection.baseOffset;
+
+      // Ensure index is within the valid range
+      if (index < 0 || index > _quillController.document.length) {
+        index = _quillController.document.length; // Append at the end
+      }
+
+      _quillController.document.insert(index, quill.BlockEmbed.image(imageUrl));
+      _quillController.moveCursorToPosition(index + 1); // Move cursor after insertion
+    }
+  }
+
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _docSubscription?.cancel();
+    _quillController.removeListener(_onDocumentChanged);
+    _quillController.dispose();
+    _titleController.dispose();
+    super.dispose();
   }
 
   @override
@@ -80,8 +139,8 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen> {
         title: Text(widget.documentId == null ? "New Document" : "Edit Document"),
         actions: [
           IconButton(
-            icon: Icon(Icons.save),
-            onPressed: _saveDocument,
+            icon: Icon(Icons.image),
+            onPressed: _insertImage, // Custom image upload button
           ),
         ],
       ),
@@ -94,16 +153,17 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen> {
             TextField(
               controller: _titleController,
               decoration: InputDecoration(labelText: "Title"),
+              onChanged: (_) {
+                _onDocumentChanged();
+              },
             ),
             SizedBox(height: 10),
             Expanded(
               child: Column(
                 children: [
-                  // ✅ Fixed Toolbar
                   quill.QuillSimpleToolbar(
                     controller: _quillController,
-                    config: QuillSimpleToolbarConfig(
-                      embedButtons: FlutterQuillEmbeds.toolbarButtons(),
+                    config: quill.QuillSimpleToolbarConfig(
                       showClipboardPaste: true,
                     ),
                   ),
@@ -116,12 +176,11 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen> {
                         ),
                         child: quill.QuillEditor(
                           controller: _quillController,
-                          scrollController: ScrollController(), // ✅ Fix for missing scrollController
+                          scrollController: ScrollController(),
                           focusNode: FocusNode(),
-
-                          config: QuillEditorConfig(
+                          config: quill.QuillEditorConfig(
                             placeholder: "Start writing your document...",
-                            embedBuilders: FlutterQuillEmbeds.editorBuilders(), // ✅ Fix for missing FlutterQuillEmbeds
+                            embedBuilders: FlutterQuillEmbeds.editorBuilders(),
                           ),
                         ),
                       ),
@@ -134,11 +193,5 @@ class _DocumentEditorScreenState extends State<DocumentEditorScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _quillController.dispose();
-    super.dispose();
   }
 }

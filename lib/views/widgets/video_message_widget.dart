@@ -1,12 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
 import 'package:get_thumbnail_video/video_thumbnail.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../routes/routes.dart';
-
 
 class InlineVideoPlayer extends StatefulWidget {
   final String videoUrl;
@@ -27,6 +25,8 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
   bool _isInitialized = false;
   bool _isPlaying = false;
   late Future<XFile?> _thumbnailFuture;
+  Duration _currentPosition = Duration.zero;
+  Duration _totalDuration = Duration.zero;
 
   @override
   void initState() {
@@ -37,11 +37,47 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
   Future<void> _initializeAndPlay() async {
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
     await _controller!.initialize();
+
     setState(() {
       _isInitialized = true;
+      _totalDuration = _controller!.value.duration;
+    });
+
+    _controller!.addListener(() {
+      setState(() {
+        _currentPosition = _controller!.value.position;
+      });
+    });
+
+    _controller!.play();
+    setState(() {
       _isPlaying = true;
     });
-    _controller!.play();
+  }
+
+  void _seekForward() async {
+    if (_controller != null) {
+      final position = await _controller!.position;
+      if (position != null) {
+        _controller!.seekTo(position + Duration(seconds: 10));
+      }
+    }
+  }
+
+  void _seekBackward() async {
+    if (_controller != null) {
+      final position = await _controller!.position;
+      if (position != null) {
+        _controller!.seekTo(position - Duration(seconds: 10));
+      }
+    }
+  }
+
+  String formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$minutes:$seconds";
   }
 
   @override
@@ -72,28 +108,67 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _onTap,
       child: Container(
-        width: 300,
+        width: 250,
         height: 300,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
           color: Colors.black,
         ),
         child: _isInitialized
-            ? VideoPlayer(_controller!)
+            ? Column(
+          children: [
+            Expanded(child: VideoPlayer(_controller!)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                children: [
+                  Text(formatDuration(_currentPosition), style: TextStyle(color: Colors.white)),
+                  Expanded(
+                    child: Slider(
+                      min: 0,
+                      max: _totalDuration.inSeconds.toDouble(),
+                      value: _currentPosition.inSeconds.toDouble().clamp(0.0, _totalDuration.inSeconds.toDouble()),
+                      onChanged: (value) {
+                        _controller!.seekTo(Duration(seconds: value.toInt()));
+                      },
+                      activeColor: Colors.red,
+                      inactiveColor: Colors.grey[700],
+                    ),
+                  ),
+                  Text(formatDuration(_totalDuration), style: TextStyle(color: Colors.white)),
+                ],
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.replay_10, color: Colors.white),
+                  onPressed: _seekBackward,
+                ),
+                IconButton(
+                  icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
+                  onPressed: _onTap,
+                ),
+                IconButton(
+                  icon: Icon(Icons.forward_10, color: Colors.white),
+                  onPressed: _seekForward,
+                ),
+              ],
+            ),
+          ],
+        )
             : FutureBuilder<XFile?>(
           future: _thumbnailFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(child: CircularProgressIndicator());
             } else if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-              // If thumbnail can't be generated, show a fallback placeholder
               return Stack(
                 children: [
                   Container(color: Colors.grey[300]),
@@ -107,7 +182,6 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
                 ],
               );
             } else {
-              // If thumbnail is available, display it with a play overlay.
               return Stack(
                 fit: StackFit.expand,
                 children: [

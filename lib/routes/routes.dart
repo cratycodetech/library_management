@@ -11,6 +11,7 @@ import '../views/home_screen.dart';
 import '../views/login_screen.dart';
 import '../bindings/auth_binding.dart';
 import '../views/pdf_viewer_screen.dart';
+import '../views/widgets/select_chat_widget.dart';
 
 
 
@@ -25,6 +26,7 @@ class AppRoutes {
   static const String pdfViewer = '/pdf-viewer';
   static const String videoDownload = '/video-download-page';
   static const String photoDownload = '/photo-download';
+  static const String selectChat = '/select-chat';
 
   static List<GetPage> pages = [
     GetPage(
@@ -97,6 +99,11 @@ class AppRoutes {
     GetPage(
       name: photoDownload,
       page: () => PhotoDownloadScreen(),
+    ),
+
+    GetPage(
+      name: selectChat, // Added select-chat page
+      page: () => SelectChatScreen(),
     ),
   ];
 }
