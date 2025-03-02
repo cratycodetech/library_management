@@ -2,49 +2,41 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
+import 'package:path/path.dart' as p;
+
 
 
 class FileUploadService {
   final SupabaseClient supabase = Supabase.instance.client;
   final String bucketName = 'library app';
 
-  Future<String?> uploadFile(String userId) async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.any,
-    );
+  Future<String?> uploadFile(String userId, File file) async {
+    if (file == null) {
+      print("🚫 No file provided.");
+      return null;
+    }
 
-    if (result != null && result.files.single.path != null) {
-      File file = File(result.files.single.path!);
-      String fileName = result.files.single.name;
+    String fileName = p.basename(file.path); // Extract file name
+    String uniqueId = Uuid().v4();
+    String newFileName = "${uniqueId}_$fileName";
+    String filePath = "$userId/uploads/$newFileName";
 
-      // ✅ Generate unique filename
-      String uniqueId = Uuid().v4();
-      String newFileName = "${uniqueId}_$fileName";
+    try {
+      await supabase.storage.from(bucketName).upload(
+        filePath,
+        file,
+        fileOptions: const FileOptions(upsert: false),
+      );
 
-
-      // ✅ Store file inside user's folder
-      String filePath = "$userId/uploads/$newFileName";
-
-      try {
-        await supabase.storage.from(bucketName).upload(
-          filePath,
-          file,
-          fileOptions: const FileOptions(upsert: false),
-        );
-
-        // ✅ Get public URL
-        final downloadUrl = supabase.storage.from(bucketName).getPublicUrl(filePath);
-        print("✅ File uploaded successfully: $downloadUrl");
-        return downloadUrl;
-      } catch (e) {
-        print("❌ Upload failed: $e");
-        return null;
-      }
-    } else {
-      print("🚫 No file selected.");
+      final downloadUrl = supabase.storage.from(bucketName).getPublicUrl(filePath);
+      print("✅ File uploaded successfully: $downloadUrl");
+      return downloadUrl;
+    } catch (e) {
+      print("❌ Upload failed: $e");
       return null;
     }
   }
+
 
   Future<String?> uploadAnnotatedFile(File file, String storagePath) async {
     try {

@@ -63,6 +63,7 @@ class GroupService {
         String? fileUrl,
         String? fileName,
         String? fileType,
+        String? localPath
       }) async {
     try {
       await groupsCollection.doc(groupId).collection('messages').add({
@@ -72,6 +73,8 @@ class GroupService {
         'fileUrl': fileUrl,
         'fileName': fileName,
         'fileType': fileType,
+        'localPaths': {userId: localPath},
+        'groupId': groupId,
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (e) {

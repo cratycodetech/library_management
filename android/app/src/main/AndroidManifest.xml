@@ -1,6 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.library_app">
 
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+<!--            <data android:mimeType="image/*"/>-->
+        </intent>
+    </queries>
+
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
@@ -12,19 +19,25 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
+
+
+
+
 
 
     <!-- The Agora SDK requires Bluetooth permissions in case users are using Bluetooth devices. -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <!-- For Android 12 and above devices, the following permission is also required. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <application
         android:label="library_app"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        android:requestLegacyExternalStorage="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
