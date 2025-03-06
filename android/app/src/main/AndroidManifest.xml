@@ -23,16 +23,24 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
-
-
-
-
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
 
     <!-- The Agora SDK requires Bluetooth permissions in case users are using Bluetooth devices. -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <!-- For Android 12 and above devices, the following permission is also required. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
+    <uses-permission android:name="android.permission.MEDIA_PROJECTION"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+
+
+
+
 
     <application
         android:label="library_app"
@@ -65,6 +73,23 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.receivers.NotificationBroadcastReceiver"
+            android:exported="false"/>
+
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.receivers.ScheduledNotificationReceiver"
+            android:exported="false"/>
+
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.receivers.ActionBroadcastReceiver"
+            android:exported="false"/>
+        <service
+            android:name="io.agora.rtc2.extensions.MediaProjectionMgr$LocalScreenCaptureAssistantActivity"
+            android:foregroundServiceType="mediaProjection"
+            android:permission="android.permission.BIND_SCREEN_SERVICE"
+            android:exported="false"/>
+
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

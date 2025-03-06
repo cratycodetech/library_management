@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:library_app/views/widgets/bottomNavigationBar_widget.dart';
 import '../controllers/auth_controller.dart';
 import '../routes/routes.dart';
+import 'all_people_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -63,6 +64,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
           if (index == 2) { // Group tab index
             Get.toNamed(AppRoutes.groupList);
+          }
+          if (index == 1) {
+            Get.to(() => const AllPeopleScreen());
           }
         },
       ),

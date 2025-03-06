@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:library_app/views/widgets/video_message_widget.dart';
+import 'package:library_app/views/widgets/voice_message_widget.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -23,7 +24,7 @@ import 'group_documents_screen.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
-
+import 'dart:async';
 
 class GroupChatScreen extends StatefulWidget {
   final String groupId;
@@ -52,6 +53,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   final _audioRecorder = AudioRecorder();
   bool isRecording = false;
   String? filePath;
+  Timer? _recordingTimer;
+  int _recordDuration = 0;
 
   @override
   void initState() {
@@ -64,11 +67,33 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   Future<void> _toggleRecording() async {
     if (isRecording) {
       final path = await _audioRecorder.stop();
+      _recordingTimer?.cancel();
       setState(() {
         isRecording = false;
         filePath = path;
+        _recordDuration = 0;
       });
-      print('Recording saved: $filePath');
+      print('🎤 Recording saved: $filePath');
+
+      if (filePath != null) {
+        File recordedFile = File(filePath!);
+
+        String fileName =
+            "${DateTime.now().millisecondsSinceEpoch}_${p.basename(filePath!)}";
+
+        String? uploadedUrl =
+            await FileUploadService().uploadRecordingToSupabase(recordedFile);
+
+        if (uploadedUrl != null) {
+          // Get current user ID and name
+          String userId = _auth.currentUser!.uid;
+          String userName = _auth.currentUser!.displayName ?? "Unknown User";
+
+          // Send voice SMS using _groupService
+          await _groupService.sendVoiceSMS(
+              widget.groupId, userId, userName, uploadedUrl, fileName);
+        }
+      }
     } else {
       if (await _audioRecorder.hasPermission()) {
         final path = await _getFilePath();
@@ -76,12 +101,29 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         setState(() {
           isRecording = true;
           filePath = path;
+          _recordDuration = 0; // Reset timer
         });
+
+        // Start recording timer
+        _recordingTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+          setState(() {
+            _recordDuration++;
+          });
+        });
+
+        print('🎤 Recording started: $filePath');
       } else {
-        print('No permission for recording');
+        print('🚫 No permission for recording');
       }
     }
   }
+
+  String _formatDuration(int seconds) {
+    final int minutes = seconds ~/ 60;
+    final int remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
   Future<String> _getFilePath() async {
     final directory = await getApplicationDocumentsDirectory();
     return '${directory.path}/recorded_audio.m4a';
@@ -112,33 +154,28 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
-
-  void _forwardMessage(String fileUrl, String fileType, String fileName, String? text) {
+  void _forwardMessage(
+      String fileUrl, String fileType, String fileName, String? text) {
     Get.toNamed('/select-chat', arguments: {
       'fileUrl': fileUrl,
       'fileType': fileType,
       'fileName': fileName,
       'text': text,
     });
-
   }
 
-
-
   void _sendMessage() async {
-    if (_messageController.text.trim().isEmpty ) return;
+    if (_messageController.text.trim().isEmpty) return;
 
     String userId = _auth.currentUser!.uid;
     String userName = _auth.currentUser!.displayName ?? "Unknown User";
 
-
-      await _groupService.sendMessage(
-        widget.groupId,
-        userId,
-        userName,
-        _messageController.text.trim(),
-      );
-
+    await _groupService.sendMessage(
+      widget.groupId,
+      userId,
+      userName,
+      _messageController.text.trim(),
+    );
 
     _messageController.clear();
     setState(() {
@@ -203,8 +240,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     });
   }
 
-  Future<void> _shareDownloadedFile(String? fileUrl, Map<String, dynamic>? localPaths, String groupId, String userId, String userName, String messageId) async {
-
+  Future<void> _shareDownloadedFile(
+      String? fileUrl,
+      Map<String, dynamic>? localPaths,
+      String groupId,
+      String userId,
+      String userName,
+      String messageId) async {
     try {
       File? file;
       if (localPaths != null && localPaths.containsKey(userId)) {
@@ -215,31 +257,33 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           if (await file.exists()) {
             _shareFile(file);
             return;
-          }
-          else{
+          } else {
             if (fileUrl != null) {
               if (Platform.isAndroid && !(await _requestStoragePermission())) {
                 return;
               }
 
-
               final response = await http.get(Uri.parse(fileUrl));
               if (response.statusCode == 200) {
                 Uint8List fileData = response.bodyBytes;
 
-                RegExp regex = RegExp(r"/([^/]+\.(jpg|jpeg|png|gif|bmp|webp|mp4|avi))");
+                RegExp regex =
+                    RegExp(r"/([^/]+\.(jpg|jpeg|png|gif|bmp|webp|mp4|avi))");
                 Match? match = regex.firstMatch(fileUrl);
-                String fileName = match != null ? match.group(1)! : "downloaded_file";
+                String fileName =
+                    match != null ? match.group(1)! : "downloaded_file";
 
                 int androidVersion = await _androidVersion();
                 if (androidVersion >= 29) {
-                  final result = await ImageGallerySaverPlus.saveImage(fileData, name: fileName);
+                  final result = await ImageGallerySaverPlus.saveImage(fileData,
+                      name: fileName);
                   if (result['isSuccess'] == true) {
                     _filePath = await _getRealPathFromUri(result['filePath']);
                     if (_filePath != null) {
                       File savedFile = File(_filePath!);
                       print("✅ File saved at: $_filePath");
-                      await _updateLocalPathInFirestore(groupId,messageId, userId, _filePath!);
+                      await _updateLocalPathInFirestore(
+                          groupId, messageId, userId, _filePath!);
                       _shareFile(savedFile);
                     }
                   } else {
@@ -247,7 +291,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                   }
                 } else {
                   // Save manually in Downloads/Messenger (Android <10)
-                  final directory = Directory("/storage/emulated/0/Download/library");
+                  final directory =
+                      Directory("/storage/emulated/0/Download/library");
                   if (!(await directory.exists())) {
                     await directory.create(recursive: true);
                   }
@@ -260,7 +305,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                     _filePath = filePath;
                     print("✅ File saved at: $_filePath");
 
-                    await _updateLocalPathInFirestore(groupId,messageId, userId, _filePath!);
+                    await _updateLocalPathInFirestore(
+                        groupId, messageId, userId, _filePath!);
                     _shareFile(file);
                   } else {
                     print("❌ Failed to save file.");
@@ -281,24 +327,26 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           return;
         }
 
-
         final response = await http.get(Uri.parse(fileUrl));
         if (response.statusCode == 200) {
           Uint8List fileData = response.bodyBytes;
 
-          RegExp regex = RegExp(r"/([^/]+\.(jpg|jpeg|png|gif|bmp|webp|mp4|avi))");
+          RegExp regex =
+              RegExp(r"/([^/]+\.(jpg|jpeg|png|gif|bmp|webp|mp4|avi))");
           Match? match = regex.firstMatch(fileUrl);
           String fileName = match != null ? match.group(1)! : "downloaded_file";
 
           int androidVersion = await _androidVersion();
           if (androidVersion >= 29) {
-            final result = await ImageGallerySaverPlus.saveImage(fileData, name: fileName);
+            final result =
+                await ImageGallerySaverPlus.saveImage(fileData, name: fileName);
             if (result['isSuccess'] == true) {
               _filePath = await _getRealPathFromUri(result['filePath']);
               if (_filePath != null) {
                 File savedFile = File(_filePath!);
                 print("✅ File saved at: $_filePath");
-                await _updateLocalPathInFirestore(groupId,messageId, userId, _filePath!);
+                await _updateLocalPathInFirestore(
+                    groupId, messageId, userId, _filePath!);
                 _shareFile(savedFile);
               }
             } else {
@@ -319,7 +367,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               _filePath = filePath;
               print("✅ File saved at: $_filePath");
 
-              await _updateLocalPathInFirestore(groupId,messageId, userId, _filePath!);
+              await _updateLocalPathInFirestore(
+                  groupId, messageId, userId, _filePath!);
               _shareFile(file);
             } else {
               print("❌ Failed to save file.");
@@ -331,12 +380,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       } else {
         throw Exception("File unavailable for sharing!");
       }
-
     } catch (e) {
       print("❌ Error sharing file: $e");
     }
   }
-
 
   Future<void> _updateLocalPathInFirestore(
       String groupId, String messageId, String userId, String localPath) async {
@@ -350,7 +397,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       DocumentSnapshot docSnapshot = await docRef.get();
 
       if (docSnapshot.exists) {
-        Map<String, dynamic>? localPaths = docSnapshot['localPaths'] as Map<String, dynamic>?;
+        Map<String, dynamic>? localPaths =
+            docSnapshot['localPaths'] as Map<String, dynamic>?;
 
         if (localPaths != null && localPaths.containsKey(userId)) {
           print("🔄 User ID exists, updating path...");
@@ -360,9 +408,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         } else {
           print("🆕 User ID not found, adding new entry...");
           await docRef.set({
-            'localPaths': {
-              userId: localPath
-            }
+            'localPaths': {userId: localPath}
           }, SetOptions(merge: true));
         }
 
@@ -375,11 +421,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
-
-
-
-
-
   Future<int> _androidVersion() async {
     final String version = await Platform.operatingSystemVersion;
     return int.tryParse(version.split(".")[0]) ?? 30; // Default to API 30+
@@ -389,7 +430,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     if (uri.startsWith("content://")) {
       try {
         const platform = MethodChannel('file_provider');
-        final realPath = await platform.invokeMethod('getRealPath', {"uri": uri});
+        final realPath =
+            await platform.invokeMethod('getRealPath', {"uri": uri});
         return realPath;
       } catch (e) {
         print("❌ Error getting real path: $e");
@@ -399,13 +441,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     return uri;
   }
 
-
-
   Future<bool> _requestStoragePermission() async {
     if (Platform.isAndroid) {
       int androidVersion = await _androidVersion();
       if (androidVersion >= 30) {
-        print("✅ Android 11+ does NOT require storage permission for MediaStore.");
+        print(
+            "✅ Android 11+ does NOT require storage permission for MediaStore.");
         return true;
       }
       if (await Permission.storage.request().isGranted) {
@@ -420,27 +461,24 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     return true; // iOS does not need this permission
   }
 
-
-
   Future<void> sendMessage(
-      String groupId,
-      String userId,
-      String userName,
-      String text, {
-        String? fileUrl,
-        String? fileName,
-        String? fileType,
-        String? localPath
-      }) async {
+      String groupId, String userId, String userName, String text,
+      {String? fileUrl,
+      String? fileName,
+      String? fileType,
+      String? localPath}) async {
     try {
-      await FirebaseFirestore.instance.collection('groups').doc(groupId).collection('messages').add({
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(groupId)
+          .collection('messages')
+          .add({
         'senderId': userId,
         'senderName': userName,
-
         'fileUrl': fileUrl,
         'fileName': fileName,
         'fileType': fileType,
-        'localPath' : localPath,
+        'localPath': localPath,
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (e) {
@@ -449,11 +487,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   }
 
   void _shareFile(File file) {
-    Share.shareXFiles([XFile(file.path)], text: "Here is the file you requested.");
+    Share.shareXFiles([XFile(file.path)],
+        text: "Here is the file you requested.");
   }
-
-
-
 
   void _showMediaOptions() {
     showModalBottomSheet(
@@ -483,7 +519,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     );
   }
 
-
   void _showMediaBottomSheet() async {
     if (mediaList.isEmpty) {
       await _fetchRecentMedia();
@@ -491,7 +526,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     showModalBottomSheet(
       context: context,
       builder: (context) {
-        return StatefulBuilder( // Allows UI updates inside BottomSheet
+        return StatefulBuilder(
+          // Allows UI updates inside BottomSheet
           builder: (context, setSheetState) {
             return Column(
               mainAxisSize: MainAxisSize.min,
@@ -499,7 +535,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 Expanded(
                   child: GridView.builder(
                     controller: _scrollController,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
                       crossAxisSpacing: 4,
                       mainAxisSpacing: 4,
@@ -509,15 +546,19 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                       final asset = mediaList[index];
 
                       return FutureBuilder<Uint8List?>(
-                        future: asset.thumbnailData, // Get thumbnail for videos
+                        future: asset.thumbnailData,
                         builder: (context, thumbSnapshot) {
-                          if (thumbSnapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
-                          } else if (thumbSnapshot.hasError || thumbSnapshot.data == null) {
+                          if (thumbSnapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                                child: CircularProgressIndicator());
+                          } else if (thumbSnapshot.hasError ||
+                              thumbSnapshot.data == null) {
                             return Container(color: Colors.grey);
                           }
 
-                          final isSelected = _selectedAsset == asset; // Check selection
+                          final isSelected =
+                              _selectedAsset == asset; // Check selection
 
                           return GestureDetector(
                             onTap: () {
@@ -529,12 +570,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                               alignment: Alignment.center,
                               children: [
                                 Positioned.fill(
-                                  child: Image.memory(thumbSnapshot.data!, fit: BoxFit.cover),
+                                  child: Image.memory(thumbSnapshot.data!,
+                                      fit: BoxFit.cover),
                                 ),
                                 // Show play icon if the media is a video
                                 if (asset.type == AssetType.video)
                                   Positioned(
-                                    child: Icon(Icons.play_circle_fill, color: Colors.white, size: 50),
+                                    child: Icon(Icons.play_circle_fill,
+                                        color: Colors.white, size: 50),
                                   ),
                                 // Show selection overlay
                                 if (isSelected)
@@ -542,7 +585,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                     child: Container(
                                       color: Colors.black.withOpacity(0.5),
                                       child: const Center(
-                                        child: Icon(Icons.check_circle, color: Colors.white, size: 30),
+                                        child: Icon(Icons.check_circle,
+                                            color: Colors.white, size: 30),
                                       ),
                                     ),
                                   ),
@@ -574,7 +618,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                       ),
                     ),
                   ),
-
               ],
             );
           },
@@ -585,7 +628,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   void _sendSelectedMedia() async {
     if (_selectedAsset == null) return;
-
 
     File? file = await _selectedAsset!.file;
     if (file == null) {
@@ -608,10 +650,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       return;
     }
 
-
-    String fileType =  p.extension(file.path).replaceFirst('.', '').toLowerCase();
-
-
+    String fileType =
+        p.extension(file.path).replaceFirst('.', '').toLowerCase();
 
     await _groupService.sendMessage(
       widget.groupId,
@@ -621,9 +661,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       fileUrl: fileUrl,
       fileName: p.basename(file.path),
       fileType: fileType,
-      localPath: localFilePath ,
+      localPath: localFilePath,
     );
-
 
     setState(() {
       _selectedAsset = null;
@@ -644,7 +683,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       return;
     }
 
-    String fileType = p.extension(file.path).replaceFirst('.', '').toLowerCase();
+    String fileType =
+        p.extension(file.path).replaceFirst('.', '').toLowerCase();
 
     await _groupService.sendMessage(
       widget.groupId,
@@ -663,18 +703,20 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     print("✅ File sent: $fileUrl");
   }
 
-
   Future<void> _fetchRecentMedia() async {
     if (isLoading) return;
     isLoading = true;
 
-    final PermissionState permission = await PhotoManager.requestPermissionExtend();
+    final PermissionState permission =
+        await PhotoManager.requestPermissionExtend();
 
     if (permission.isAuth) {
-      final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(type: RequestType.common);
+      final List<AssetPathEntity> albums =
+          await PhotoManager.getAssetPathList(type: RequestType.common);
       if (albums.isNotEmpty) {
         final int totalAssets = await albums.first.assetCountAsync;
-        final List<AssetEntity> newMedia = await albums.first.getAssetListPaged(page: currentPage, size: totalAssets);
+        final List<AssetEntity> newMedia = await albums.first
+            .getAssetListPaged(page: currentPage, size: totalAssets);
         if (newMedia.isNotEmpty) {
           setState(() {
             mediaList.addAll(newMedia);
@@ -691,14 +733,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     isLoading = false;
   }
 
-
   void _loadMoreMedia() {
-    if (!isLoading && _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100) {
+    if (!isLoading &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 100) {
       _fetchRecentMedia();
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -844,28 +885,45 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                         ),
                                       ] else ...[
                                         // Possibly a file message
-                                        if ((message['fileType'] ?? '').toLowerCase() == 'pdf')
+                                        if ((message['fileType'] ?? '')
+                                                .toLowerCase() ==
+                                            'm4a')
+                                          VoiceMessageWidget(
+                                            fileUrl: message['fileUrl'],
+                                            isMe: isMe,
+                                          ),
+                                        if ((message['fileType'] ?? '')
+                                                .toLowerCase() ==
+                                            'pdf')
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Expanded(
                                                 child: GestureDetector(
                                                   onTap: () {
-                                                    Get.toNamed('/pdf-viewer', arguments: {
-                                                      'pdfUrl': message['fileUrl'] ?? ''
-                                                    });
+                                                    Get.toNamed('/pdf-viewer',
+                                                        arguments: {
+                                                          'pdfUrl': message[
+                                                                  'fileUrl'] ??
+                                                              ''
+                                                        });
                                                   },
                                                   child: Text(
-                                                    message['fileName'] ?? 'Unknown File',
+                                                    message['fileName'] ??
+                                                        'Unknown File',
                                                     style: TextStyle(
-                                                      color: isMe ? Colors.white : Colors.black,
-                                                      decoration: TextDecoration.underline,
+                                                      color: isMe
+                                                          ? Colors.white
+                                                          : Colors.black,
+                                                      decoration: TextDecoration
+                                                          .underline,
                                                     ),
                                                   ),
                                                 ),
                                               ),
                                               IconButton(
-                                                icon: Icon(Icons.arrow_upward, color: Colors.blue),
+                                                icon: Icon(Icons.arrow_upward,
+                                                    color: Colors.blue),
                                                 onPressed: () {
                                                   _forwardMessage(
                                                     message['fileUrl'],
@@ -873,60 +931,85 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                                     message['fileName'],
                                                     message['text'],
                                                   );
-
                                                 },
                                               ),
                                               IconButton(
-                                                icon: Icon(Icons.share, color: Colors.blue),
+                                                icon: Icon(Icons.share,
+                                                    color: Colors.blue),
                                                 onPressed: () async {
-                                                  String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+                                                  String? currentUserId =
+                                                      FirebaseAuth.instance
+                                                          .currentUser?.uid;
 
                                                   if (currentUserId != null) {
                                                     _shareDownloadedFile(
-                                                        message['fileUrl'] ?? '',
-                                                        message['localPaths'] ?? '',
-                                                        message['groupId'] ?? 'Unknown group',
+                                                        message['fileUrl'] ??
+                                                            '',
+                                                        message['localPaths'] ??
+                                                            '',
+                                                        message['groupId'] ??
+                                                            'Unknown group',
                                                         currentUserId,
-                                                        message['senderName'] ?? 'Unknown',
-                                                        message.id
-                                                    );
+                                                        message['senderName'] ??
+                                                            'Unknown',
+                                                        message.id);
                                                   } else {
-                                                    print("User not logged in.");
+                                                    print(
+                                                        "User not logged in.");
                                                   }
                                                 },
                                               ),
-
                                             ],
                                           )
-                                        else if ((message['fileType'] ?? '').toLowerCase() == 'jpg' ||
-                                            (message['fileType'] ?? '').toLowerCase() == 'jpeg' ||
-                                            (message['fileType'] ?? '').toLowerCase() == 'png')
+                                        else if ((message['fileType'] ?? '')
+                                                    .toLowerCase() ==
+                                                'jpg' ||
+                                            (message['fileType'] ?? '')
+                                                    .toLowerCase() ==
+                                                'jpeg' ||
+                                            (message['fileType'] ?? '')
+                                                    .toLowerCase() ==
+                                                'png')
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               GestureDetector(
                                                 onTap: () {
-                                                  Get.toNamed(AppRoutes.photoDownload, arguments: {
-                                                    'photoUrl': message['fileUrl'] ?? '',
-                                                  });
+                                                  Get.toNamed(
+                                                      AppRoutes.photoDownload,
+                                                      arguments: {
+                                                        'photoUrl': message[
+                                                                'fileUrl'] ??
+                                                            '',
+                                                      });
                                                 },
                                                 child: ClipRRect(
-                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
                                                   child: SizedBox(
-                                                    width: 150, // Adjust size if necessary
+                                                    width:
+                                                        150, // Adjust size if necessary
                                                     height: 150,
                                                     child: Image.network(
                                                       message['fileUrl'] ?? '',
                                                       fit: BoxFit.cover,
-                                                      errorBuilder: (context, error, stackTrace) => Container(
-                                                        color: isMe ? Colors.blueAccent : Colors.grey[300],
+                                                      errorBuilder: (context,
+                                                              error,
+                                                              stackTrace) =>
+                                                          Container(
+                                                        color: isMe
+                                                            ? Colors.blueAccent
+                                                            : Colors.grey[300],
                                                         width: 150,
                                                         height: 150,
                                                         child: Center(
                                                           child: Text(
                                                             'Image could not be loaded',
                                                             style: TextStyle(
-                                                              color: isMe ? Colors.white : Colors.black,
+                                                              color: isMe
+                                                                  ? Colors.white
+                                                                  : Colors
+                                                                      .black,
                                                             ),
                                                           ),
                                                         ),
@@ -936,7 +1019,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                                 ),
                                               ),
                                               IconButton(
-                                                icon: Icon(Icons.arrow_upward, color: Colors.blue),
+                                                icon: Icon(Icons.arrow_upward,
+                                                    color: Colors.blue),
                                                 onPressed: () {
                                                   _forwardMessage(
                                                     message['fileUrl'],
@@ -944,122 +1028,149 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                                     message['fileName'],
                                                     message['text'],
                                                   );
-
-
                                                 },
                                               ),
                                               IconButton(
-                                                icon: Icon(Icons.share, color: Colors.blue),
+                                                icon: Icon(Icons.share,
+                                                    color: Colors.blue),
                                                 onPressed: () async {
-                                                  String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+                                                  String? currentUserId =
+                                                      FirebaseAuth.instance
+                                                          .currentUser?.uid;
 
                                                   if (currentUserId != null) {
                                                     _shareDownloadedFile(
-                                                        message['fileUrl'] ?? '',
-                                                        message['localPaths'] ?? '',
-                                                        message['groupId'] ?? 'Unknown group',
+                                                        message['fileUrl'] ??
+                                                            '',
+                                                        message['localPaths'] ??
+                                                            '',
+                                                        message['groupId'] ??
+                                                            'Unknown group',
                                                         currentUserId,
-                                                        message['senderName'] ?? 'Unknown',
-                                                        message.id
-                                                    );
+                                                        message['senderName'] ??
+                                                            'Unknown',
+                                                        message.id);
                                                   } else {
-                                                    print("User not logged in.");
+                                                    print(
+                                                        "User not logged in.");
                                                   }
                                                 },
                                               ),
-
                                             ],
                                           )
-                                        else if ((message['fileType'] ?? '').toLowerCase() == 'mp4')
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                ClipRRect(
-                                                  borderRadius: BorderRadius.circular(10),
-                                                  child: InlineVideoPlayer(
-                                                    videoUrl: message['fileUrl'] ?? '',
-                                                    thumbnailGenerator: _groupService.generateThumbnail,
+                                        else if ((message['fileType'] ?? '')
+                                                .toLowerCase() ==
+                                            'mp4')
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                child: InlineVideoPlayer(
+                                                  videoUrl:
+                                                      message['fileUrl'] ?? '',
+                                                  thumbnailGenerator:
+                                                      _groupService
+                                                          .generateThumbnail,
+                                                ),
+                                              ),
+                                              IconButton(
+                                                icon: Icon(Icons.arrow_upward,
+                                                    color: Colors.blue),
+                                                onPressed: () {
+                                                  _forwardMessage(
+                                                    message['fileUrl'],
+                                                    message['fileType'],
+                                                    message['fileName'],
+                                                    message['text'],
+                                                  );
+                                                },
+                                              ),
+                                              IconButton(
+                                                icon: Icon(Icons.share,
+                                                    color: Colors.blue),
+                                                onPressed: () async {
+                                                  String? currentUserId =
+                                                      FirebaseAuth.instance
+                                                          .currentUser?.uid;
+
+                                                  if (currentUserId != null) {
+                                                    _shareDownloadedFile(
+                                                        message['fileUrl'] ??
+                                                            '',
+                                                        message['localPaths'] ??
+                                                            '',
+                                                        message['groupId'] ??
+                                                            'Unknown group',
+                                                        currentUserId,
+                                                        message['senderName'] ??
+                                                            'Unknown',
+                                                        message.id);
+                                                  } else {
+                                                    print(
+                                                        "User not logged in.");
+                                                  }
+                                                },
+                                              ),
+                                            ],
+                                          )
+                                        else
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  message['fileName'] ??
+                                                      'Unknown File',
+                                                  style: TextStyle(
+                                                    color: isMe
+                                                        ? Colors.white
+                                                        : Colors.black,
                                                   ),
                                                 ),
-                                                IconButton(
-                                                  icon: Icon(Icons.arrow_upward, color: Colors.blue),
-                                                  onPressed: () {
-                                                    _forwardMessage(
-                                                      message['fileUrl'],
-                                                      message['fileType'],
-                                                      message['fileName'],
-                                                      message['text'],
-                                                    );
-                                                  },
-                                                ),
-                                                IconButton(
-                                                  icon: Icon(Icons.share, color: Colors.blue),
-                                                  onPressed: () async {
-                                                    String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+                                              ),
+                                              IconButton(
+                                                icon: Icon(Icons.forward,
+                                                    color: Colors.blue),
+                                                onPressed: () {
+                                                  _forwardMessage(
+                                                    message['fileUrl'],
+                                                    message['fileType'],
+                                                    message['fileName'],
+                                                    message['text'],
+                                                  );
+                                                },
+                                              ),
+                                              IconButton(
+                                                icon: Icon(Icons.share,
+                                                    color: Colors.white),
+                                                onPressed: () async {
+                                                  String? currentUserId =
+                                                      FirebaseAuth.instance
+                                                          .currentUser?.uid;
 
-                                                    if (currentUserId != null) {
-                                                      _shareDownloadedFile(
-                                                          message['fileUrl'] ?? '',
-                                                          message['localPaths'] ?? '',
-                                                          message['groupId'] ?? 'Unknown group',
-                                                          currentUserId,
-                                                          message['senderName'] ?? 'Unknown',
-                                                          message.id
-                                                      );
-                                                    } else {
-                                                      print("User not logged in.");
-                                                    }
-                                                  },
-                                                ),
-                                              ],
-                                            )
-                                          else
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    message['fileName'] ?? 'Unknown File',
-                                                    style: TextStyle(
-                                                      color: isMe ? Colors.white : Colors.black,
-                                                    ),
-                                                  ),
-                                                ),
-                                                IconButton(
-                                                  icon: Icon(Icons.forward, color: Colors.blue),
-                                                  onPressed: () {
-                                                    _forwardMessage(
-                                                      message['fileUrl'],
-                                                      message['fileType'],
-                                                      message['fileName'],
-                                                      message['text'],
-                                                    );
-
-                                                  },
-                                                ),
-                                                IconButton(
-                                                  icon: Icon(Icons.share, color: Colors.blue),
-                                                  onPressed: () async {
-                                                    String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
-
-                                                    if (currentUserId != null) {
-                                                      _shareDownloadedFile(
-                                                          message['fileUrl'] ?? '',
-                                                          message['localPaths'] ?? '',
-                                                          message['groupId'] ?? 'Unknown group',
-                                                          currentUserId,
-                                                          message['senderName'] ?? 'Unknown',
-                                                          message.id
-                                                      );
-                                                    } else {
-                                                      print("User not logged in.");
-                                                    }
-                                                  },
-                                                ),
-                                              ],
-                                            ),
+                                                  if (currentUserId != null) {
+                                                    _shareDownloadedFile(
+                                                        message['fileUrl'] ??
+                                                            '',
+                                                        message['localPaths'] ??
+                                                            '',
+                                                        message['groupId'] ??
+                                                            'Unknown group',
+                                                        currentUserId,
+                                                        message['senderName'] ??
+                                                            'Unknown',
+                                                        message.id);
+                                                  } else {
+                                                    print(
+                                                        "User not logged in.");
+                                                  }
+                                                },
+                                              ),
+                                            ],
+                                          ),
                                       ],
-
                                     ],
                                   ),
                                 ),
@@ -1100,6 +1211,17 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                   icon: Icon(isRecording ? Icons.stop : Icons.mic),
                   color: isRecording ? Colors.red : null,
                   onPressed: _toggleRecording,
+                ),
+                if (isRecording) // Show time when recording
+                  Text(
+                    _formatDuration(_recordDuration),
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red),
+                  ),
+                SizedBox(
+                  width: 8,
                 ),
                 Expanded(
                   child: TextField(

@@ -17,17 +17,18 @@ class BottomNavBar extends StatelessWidget {
       onTap: onTap,
       items: const [
         BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: "Profile",
-        ),
-        BottomNavigationBarItem(
           icon: Icon(Icons.home),
           label: "Home",
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.people),
+          label: "All people",
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.group),
           label: "Group",
         ),
+
       ],
     );
   }

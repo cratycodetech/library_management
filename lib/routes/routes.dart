@@ -1,7 +1,10 @@
 import 'package:get/get.dart';
 import '../bindings/pdf_annotation_binding.dart';
+import '../views/all_people_screen.dart';
 import '../views/create_group_screen.dart';
 import '../views/image_download_screen.dart';
+import '../views/one_to_one_call_screen.dart';
+import '../views/one_to_one_chat_screen.dart';
 import '../views/video_download_screen.dart';
 import '../views/group_call_screen.dart';
 import '../views/group_chat_screen.dart';
@@ -27,6 +30,9 @@ class AppRoutes {
   static const String videoDownload = '/video-download-page';
   static const String photoDownload = '/photo-download';
   static const String selectChat = '/select-chat';
+  static const String allPeople = '/all-people';
+  static const String chat = '/chat';
+  static const String callScreen = '/call';
 
   static List<GetPage> pages = [
     GetPage(
@@ -104,6 +110,32 @@ class AppRoutes {
     GetPage(
       name: selectChat, // Added select-chat page
       page: () => SelectChatScreen(),
+    ),
+    GetPage(
+      name: allPeople, // Added All People route
+      page: () => const AllPeopleScreen(),
+    ),
+
+    GetPage(
+      name: chat,
+      page: () {
+        final args = Get.arguments as Map<String, dynamic>;
+        return ChatScreen(
+          receiverId: args['receiverId'],
+          receiverName: args['receiverName'],
+          receiverPhotoURL: args['receiverPhotoURL'],
+        );
+      },
+    ),
+    GetPage(
+      name: callScreen, // Added call screen route
+      page: () {
+        final args = Get.arguments as Map<String, dynamic>;
+        return CallScreen(
+          channelName: args['channelName'],
+          token: args['token'],
+        );
+      },
     ),
   ];
 }

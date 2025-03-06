@@ -98,6 +98,35 @@ class FileUploadService {
     }
   }
 
+  Future<String?> uploadRecordingToSupabase(File recordingFile) async {
+    try {
+      if (!await recordingFile.exists()) {
+        print("🚫 Recording file does not exist.");
+        return null;
+      }
+
+
+      String uniqueId = Uuid().v4();
+      String fileName = "recording_${uniqueId}.m4a";
+      String filePath = "recordings/$fileName";
+
+
+      await supabase.storage.from(bucketName).upload(
+        filePath,
+        recordingFile,
+        fileOptions: const FileOptions(upsert: false),
+      );
+
+      final String downloadUrl = supabase.storage.from(bucketName).getPublicUrl(filePath);
+      print("✅ Recording uploaded successfully: $downloadUrl");
+
+      return downloadUrl;
+    } catch (e) {
+      print("❌ Recording upload failed: $e");
+      return null;
+    }
+  }
+
 
 
 }

@@ -41,6 +41,10 @@ dependencies:
   photo_manager: ^3.6.4
   image_gallery_saver_plus: ^3.0.5
   record: ^5.0.4
+  audioplayers: ^5.2.1
+  flutter_sound: ^9.2.13
+  flutter_local_notifications: ^18.0.1
+  firebase_messaging: ^15.2.4
 
 
 dev_dependencies:

@@ -1,11 +1,27 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
+import 'package:library_app/services/notification_remote_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'routes/routes.dart';
 import 'services/firebase_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+FlutterLocalNotificationsPlugin();
+
+Future<void> requestNotificationPermission() async {
+  if (await Permission.notification.isDenied) {
+    await Permission.notification.request();
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +34,47 @@ void main() async {
     debug: true,
     ignoreSsl: true,
   );
+  await requestNotificationPermission();
+  // Android settings
+  const AndroidInitializationSettings androidInitSettings =
+  AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  // iOS settings
+  final DarwinInitializationSettings iosInitSettings =
+  DarwinInitializationSettings();
+
+  final InitializationSettings initSettings = InitializationSettings(
+    android: androidInitSettings,
+    iOS: iosInitSettings,
+  );
+
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
+  await Firebase.initializeApp();
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  String? fcmToken = await messaging.getToken();
+  if (fcmToken != null) {
+    print("🔥 FCM Token: $fcmToken");
+  } else {
+    print("❌ Failed to retrieve FCM token.");
+  }
+
+
+  if (fcmToken != null) {
+    String? fcmToken = await messaging.getToken();
+    if (fcmToken != null) {
+      try {
+        await NotificationRemoteService().updateFcmToken(fcmToken: fcmToken);
+        print("✅ FCM Token updated successfully.");
+      } catch (e) {
+        print("❌ Failed to update `FCM` token: $e");
+      }
+    } else {
+      print("❌ Failed to retrieve FCM token.");
+    }
+  }
+
+
   runApp(MyApp());
 }
 
@@ -29,14 +86,14 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
 
       debugShowCheckedModeBanner: false,
-      initialRoute: AppRoutes.login, // Start with login
-      getPages: AppRoutes.pages, // Use predefined routes with bindings
+      initialRoute: AppRoutes.login,
+      getPages: AppRoutes.pages,
 
       localizationsDelegates: [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
-        FlutterQuillLocalizations.delegate, // ✅ Fixes Missing Localization Error
+        FlutterQuillLocalizations.delegate,
       ],
       supportedLocales: [
         Locale('en', 'US'), // English

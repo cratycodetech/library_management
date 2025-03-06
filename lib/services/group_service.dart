@@ -113,4 +113,31 @@ class GroupService {
   }
 
 
+  Future<void> sendVoiceSMS(
+      String groupId,
+      String userId,
+      String userName,
+      String fileUrl,
+      String fileName,
+      ) async {
+    try {
+      await groupsCollection.doc(groupId).collection('messages').add({
+        'senderId': userId,
+        'senderName': userName,
+        'fileUrl': fileUrl,
+        'fileName': fileName,
+        'fileType': 'm4a',
+        'text' : '',
+        'groupId': groupId,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      print("✅ Voice SMS sent successfully");
+    } catch (e) {
+      print("❌ Error sending Voice SMS: $e");
+    }
+  }
+
+
+
 }
