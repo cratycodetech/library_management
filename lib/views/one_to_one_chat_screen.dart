@@ -109,6 +109,7 @@ class _ChatScreenState extends State<ChatScreen> {
       String channelName = chatRoomId;
 
 
+
       String? token = await _agoraService.generateToken(channelName, 0);
       if (token == null) {
         print("❌ Failed to generate Agora token.");
@@ -132,7 +133,7 @@ class _ChatScreenState extends State<ChatScreen> {
       await _firestore.collection('calls').doc(channelName).set(callData, SetOptions(merge: true));
 
       print("✅ Successfully stored call data in Firestore.");
-
+      print("channel Name $channelName");
       // Navigate to Call Screen
       Get.to(() => CallScreen(channelName: channelName, token: token));
     } catch (e, stackTrace) {

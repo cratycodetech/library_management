@@ -14,9 +14,9 @@
 
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
@@ -29,14 +29,18 @@
 
 
     <!-- The Agora SDK requires Bluetooth permissions in case users are using Bluetooth devices. -->
-    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
     <!-- For Android 12 and above devices, the following permission is also required. -->
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
+
+
     <uses-permission android:name="android.permission.MEDIA_PROJECTION"/>
+
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+
 
 
 
@@ -85,10 +89,11 @@
             android:name="com.dexterous.flutterlocalnotifications.receivers.ActionBroadcastReceiver"
             android:exported="false"/>
         <service
-            android:name="io.agora.rtc2.extensions.MediaProjectionMgr$LocalScreenCaptureAssistantActivity"
+            android:name="io.agora.rtc2.extensions.MediaProjectionMgr$LocalScreenCaptureService"
             android:foregroundServiceType="mediaProjection"
             android:permission="android.permission.BIND_SCREEN_SERVICE"
             android:exported="false"/>
+
 
     </application>
     <!-- Required to query activities that can process text, see:

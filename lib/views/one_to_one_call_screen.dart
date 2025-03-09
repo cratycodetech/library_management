@@ -1,4 +1,8 @@
+import 'dart:io';
+import 'dart:ui';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -43,70 +47,64 @@ class _CallScreenState extends State<CallScreen> {
     _initAgora();
     _listenForCallEnd();
     _listenForVideoToggle();
+    print("channel Name ${widget.channelName}");
   }
+
 
   Future<void> _initAgora() async {
     try {
       if (_hasJoined) return;
       await _handlePermissions();
       print("🔹 Initializing Agora...");
+
       _engine = createAgoraRtcEngine();
       await _engine.initialize(const RtcEngineContext(
-        appId: "68cc27d382a44628a9454809677e96e6",
+        appId: "68cc27d382a44628a9454809677e96e6", // ✅ Agora App ID
       ));
 
       _engine.registerEventHandler(RtcEngineEventHandler(
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-          if (!_isDisposed) {
-            setState(() {
-              _localUserJoined = true;
-              _hasJoined = true;
-            });
-          }
           print("✅ Successfully joined channel!");
+          setState(() {
+            _localUserJoined = true;
+            _hasJoined = true;
+          });
         },
+
         onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
-          if (!_isDisposed) {
-            setState(() {
-              _remoteUid = remoteUid;
-            });
-          }
           print("✅ Remote user joined: $remoteUid");
+          setState(() {
+            _remoteUid = remoteUid;
+          });
+          _engine.setRemoteVideoStreamType(
+            uid: remoteUid,
+            streamType: VideoStreamType.videoStreamHigh,
+          );
         },
+
         onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
           print("🚨 Remote user left: $remoteUid");
-          _endCall(); // Automatically end call when other user leaves
         },
+
+
+        onLocalVideoStateChanged: (VideoSourceType source, LocalVideoStreamState state, LocalVideoStreamReason reason) {
+          print("📹 Local Video State Changed: Source: $source | State: $state | Reason: $reason");
+        },
+
+        onRemoteVideoStateChanged: (RtcConnection connection, int remoteUid, RemoteVideoState state, RemoteVideoStateReason reason, int elapsed) {
+          print("📹 Remote video state changed: $state - Reason: $reason");
+        },
+
         onError: (ErrorCodeType error, String msg) {
           print("🚨 Agora Error: $error - $msg");
         },
       ));
 
-      _engine.registerEventHandler(RtcEngineEventHandler(
-        onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
-          print("✅ Remote user joined: $remoteUid");
-
-          if (!_isDisposed) {
-            setState(() {
-              _remoteUid = remoteUid;
-            });
-          }
-
-          bool isScreenSharing = remoteUid == _remoteUid! + 1;
-          if (isScreenSharing) {
-            print("🖥️ Remote user is sharing screen");
-            _engine.muteRemoteVideoStream(uid: remoteUid, mute: false);
-          }
-
-        },
-      ));
-
-
       await _engine.enableVideo();
       await _engine.enableAudio();
       await _engine.startPreview();
       await _engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
-
+      await _engine.enableDualStreamMode(enabled: true);
       print("🔹 Joining channel: ${widget.channelName}");
       await _engine.joinChannel(
         token: widget.token,
@@ -118,14 +116,20 @@ class _CallScreenState extends State<CallScreen> {
       print("🚨 Exception in Agora: $e");
     }
   }
+
+
+
+
   Future<void> _handlePermissions() async {
     Map<Permission, PermissionStatus> statuses = await [
       Permission.camera,
       Permission.microphone,
+    Permission.systemAlertWindow,
     ].request();
 
     if (statuses[Permission.camera] != PermissionStatus.granted ||
-        statuses[Permission.microphone] != PermissionStatus.granted) {
+        statuses[Permission.microphone] != PermissionStatus.granted||
+        statuses[Permission.systemAlertWindow] != PermissionStatus.granted) {
       print("🚨 Camera or Microphone permission not granted!");
       Get.snackbar("Permission Denied", "Please enable camera & microphone permissions in settings.");
       return;
@@ -163,7 +167,7 @@ class _CallScreenState extends State<CallScreen> {
 
 
 
-  /// **Listen for Firestore updates and exit if the call is ended**
+
   void _listenForCallEnd() {
     FirebaseFirestore.instance
         .collection('calls')
@@ -199,7 +203,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
 
-  /// **Handle Remote User Leaving (End Call for Both Users)**
+
   void _endCall() async {
     if (_callEnded) return;
     _callEnded = true;
@@ -222,7 +226,7 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void dispose() {
     _isDisposed = true;
-    _leaveCall(); // Ensure call is properly left when closing screen
+    _leaveCall();
     super.dispose();
   }
 
@@ -258,44 +262,45 @@ class _CallScreenState extends State<CallScreen> {
   }
 
 
+
+
   Future<void> startScreenShare() async {
-    try {
-      int screenShareUid = DateTime.now().millisecondsSinceEpoch.remainder(1000000);
+    await [Permission.microphone, Permission.camera].request();
 
-      String screenShareToken = await AgoraService().generateToken(widget.channelName, screenShareUid);
-      print("📺 Screen Sharing Token: $screenShareToken");
+    if (!kIsWeb && Platform.isAndroid) {
+      print("🟢 Requesting screen capture...");
 
-      _screenShareEngine = createAgoraRtcEngine();
-      await _screenShareEngine!.initialize(const RtcEngineContext(
-        appId: "68cc27d382a44628a9454809677e96e6",
+      // Start screen capture without checking a return value
+      await _engine.startScreenCapture(ScreenCaptureParameters2(
+        captureAudio: true,
+        captureVideo: true,
+        audioParams: const ScreenAudioParameters(
+          sampleRate: 100,
+        ),
+        videoParams: ScreenVideoParameters(
+          dimensions: const VideoDimensions(width: 1280, height: 720),
+          frameRate: 30,
+          bitrate: 2000,
+          contentHint: VideoContentHint.contentHintMotion,
+        ),
       ));
 
-      await _screenShareEngine!.startScreenCapture(
-        ScreenCaptureParameters2(
-          captureAudio: true,
-          audioParams: ScreenAudioParameters(),
-          videoParams: ScreenVideoParameters(frameRate: 15, bitrate: 800),
-        ),
-      );
-
-      await _screenShareEngine!.joinChannel(
-        token: screenShareToken,
-        channelId: widget.channelName,
-        uid: screenShareUid,
-        options: const ChannelMediaOptions(
-          publishScreenTrack: true,
-          publishCameraTrack: false,
-          publishMicrophoneTrack: false,
-        ),
-      );
+      print("🔹 Updating channel media options...");
+      await _engine.updateChannelMediaOptions(ChannelMediaOptions(
+        publishScreenTrack: true,
+        publishCameraTrack: false,
+        publishMicrophoneTrack: true,
+        autoSubscribeAudio: true,
+        autoSubscribeVideo: true,
+      ));
 
       setState(() {
         isSharing = true;
       });
 
-      print("📺 Screen Sharing Started!");
-    } catch (e) {
-      print("🚨 Error starting screen share: $e");
+      print("✅ Screen sharing started successfully!");
+    } else {
+      print("⚠️ Screen sharing is only available on Android.");
     }
   }
 
@@ -304,16 +309,39 @@ class _CallScreenState extends State<CallScreen> {
 
 
 
+
+
+
+
+
+
+
+
+
+
   Future<void> stopScreenShare() async {
-    await _engine.stopScreenCapture();
-    await _engine.leaveChannel();
+    try {
+      await _engine.stopScreenCapture();
 
-    setState(() {
-      isSharing = false;
-    });
 
-    print("📺 Screen Sharing Stopped!");
+      await _engine.updateChannelMediaOptions(ChannelMediaOptions(
+        publishScreenTrack: false,
+        publishCameraTrack: true,
+        publishMicrophoneTrack: true,
+      ));
+
+      setState(() {
+        isSharing = false;
+      });
+
+      print("✅ Screen sharing stopped successfully!");
+    } catch (e) {
+      print("❌ Error stopping screen share: $e");
+    }
   }
+
+
+
 
 
 
@@ -340,7 +368,10 @@ class _CallScreenState extends State<CallScreen> {
               controller: VideoViewController.remote(
                 rtcEngine: _engine,
                 connection: RtcConnection(channelId: widget.channelName),
-                canvas: VideoCanvas(uid: _remoteUid!),
+                canvas: VideoCanvas(
+                  uid: _remoteUid ?? 0,
+                  sourceType: VideoSourceType.videoSourceScreen,
+                ),
               ),
             )
                 : _defaultVideoOffScreen()) // Show Default Screen if Video is OFF
