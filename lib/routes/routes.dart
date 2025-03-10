@@ -1,10 +1,14 @@
 import 'package:get/get.dart';
 import '../bindings/pdf_annotation_binding.dart';
+import '../bindings/posting_binding.dart';
+import '../bindings/posts_binding.dart';
 import '../views/all_people_screen.dart';
 import '../views/create_group_screen.dart';
 import '../views/image_download_screen.dart';
 import '../views/one_to_one_call_screen.dart';
 import '../views/one_to_one_chat_screen.dart';
+import '../views/posting_screen.dart';
+import '../views/posts_screen.dart';
 import '../views/video_download_screen.dart';
 import '../views/group_call_screen.dart';
 import '../views/group_chat_screen.dart';
@@ -33,6 +37,8 @@ class AppRoutes {
   static const String allPeople = '/all-people';
   static const String chat = '/chat';
   static const String callScreen = '/call';
+  static const String postingScreen = '/posting';
+  static const String postsScreen = '/posts';
 
   static List<GetPage> pages = [
     GetPage(
@@ -136,6 +142,17 @@ class AppRoutes {
           token: args['token'],
         );
       },
+    ),
+
+    GetPage(
+      name: postingScreen,
+      page: () => PostingScreen(),
+      binding: PostingBinding(),
+    ),
+    GetPage(
+      name: postsScreen,
+      page: () => PostsScreen(),
+      binding: PostsBinding(),
     ),
   ];
 }

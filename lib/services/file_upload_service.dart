@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -9,6 +12,8 @@ import 'package:path/path.dart' as p;
 class FileUploadService {
   final SupabaseClient supabase = Supabase.instance.client;
   final String bucketName = 'library app';
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  final FirebaseAuth auth = FirebaseAuth.instance;
 
   Future<String?> uploadFile(String userId, File file) async {
     if (file == null) {
@@ -126,6 +131,63 @@ class FileUploadService {
       return null;
     }
   }
+
+
+  Future<String?> uploadPostedFile(File file, {bool isPremium = false}) async {
+    try {
+      firebase_auth.User? user = auth.currentUser;
+      if (user == null) {
+        print("🚫 No authenticated user.");
+        return null;
+      }
+
+
+      String userId = user.uid;
+
+
+      DocumentSnapshot userDoc = await firestore.collection("users").doc(userId).get();
+      String username = userDoc.exists ? userDoc['name'] : "Unknown User";
+
+
+      String fileExtension = p.extension(file.path).replaceAll('.', ''); // Removes dot (e.g., 'mp3', 'txt')
+
+
+      String uniqueId = Uuid().v4();
+      String fileName = "${uniqueId}_${p.basename(file.path)}";
+      String filePath = "$userId/uploads/$fileName";
+
+
+      DateTime uploadTime = DateTime.now();
+
+
+      await supabase.storage.from(bucketName).upload(
+        filePath,
+        file,
+        fileOptions: const FileOptions(upsert: false),
+      );
+
+
+      final String downloadUrl = supabase.storage.from(bucketName).getPublicUrl(filePath);
+      print("✅ File uploaded successfully: $downloadUrl");
+
+
+      await firestore.collection("uploads").add({
+        "userId": userId,
+        "username": username,
+        "fileUrl": downloadUrl,
+        "fileName": fileName,
+        "fileType": fileExtension,
+        "isPremium": isPremium,
+        "uploadedAt": uploadTime,
+      });
+
+      return downloadUrl;
+    } catch (e) {
+      print("❌ File upload failed: $e");
+      return null;
+    }
+  }
+
 
 
 

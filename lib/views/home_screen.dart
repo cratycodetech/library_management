@@ -48,6 +48,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                   child: Text("Create Group"),
                 ),
+                ElevatedButton(
+                  onPressed: () {
+                    Get.toNamed(AppRoutes.postingScreen);
+
+                  },
+                  child: Text("Post anything"),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Get.toNamed(AppRoutes.postsScreen);
+
+                  },
+                  child: Text("See post"),
+                ),
               ],
             );
           } else {
