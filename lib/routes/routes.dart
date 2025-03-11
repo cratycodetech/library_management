@@ -7,8 +7,10 @@ import '../views/create_group_screen.dart';
 import '../views/image_download_screen.dart';
 import '../views/one_to_one_call_screen.dart';
 import '../views/one_to_one_chat_screen.dart';
+import '../views/otp_screen.dart';
 import '../views/posting_screen.dart';
 import '../views/posts_screen.dart';
+import '../views/registration_screen.dart';
 import '../views/video_download_screen.dart';
 import '../views/group_call_screen.dart';
 import '../views/group_chat_screen.dart';
@@ -39,7 +41,8 @@ class AppRoutes {
   static const String callScreen = '/call';
   static const String postingScreen = '/posting';
   static const String postsScreen = '/posts';
-
+  static const String registrationScreen = '/registration';
+  static const String otpScreen = '/otp';
   static List<GetPage> pages = [
     GetPage(
       name: login,
@@ -153,6 +156,15 @@ class AppRoutes {
       name: postsScreen,
       page: () => PostsScreen(),
       binding: PostsBinding(),
+    ),
+
+    GetPage(
+      name: registrationScreen, // Added select-chat page
+      page: () => RegistrationScreen(),
+    ),
+    GetPage(
+      name: otpScreen, // Added select-chat page
+      page: () => OtpScreen(),
     ),
   ];
 }

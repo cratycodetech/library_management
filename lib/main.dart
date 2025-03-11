@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
@@ -37,6 +38,11 @@ Future<void> requestNotificationPermission() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: ".env"); // ✅ Load .env file
+  } catch (e) {
+    print("❌ Error loading .env file: $e");
+  }
   await FirebaseService.init();
   await Supabase.initialize(
     url: 'https://utomiwubfeyxyfkkmril.supabase.co',
@@ -60,7 +66,7 @@ void main() async {
     android: androidInitSettings,
     iOS: iosInitSettings,
   );
-  await enableScreenProtection();
+  //await enableScreenProtection();
   await flutterLocalNotificationsPlugin.initialize(initSettings);
   await Firebase.initializeApp();
   FirebaseMessaging messaging = FirebaseMessaging.instance;

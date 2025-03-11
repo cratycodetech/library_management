@@ -5,7 +5,13 @@ class UserModel {
   final String photoURL;
   final String role;
 
-  UserModel({required this.uid, required this.name, required this.email, required this.photoURL, required this.role});
+  UserModel({
+    required this.uid,
+    required this.name,
+    required this.email,
+    required this.photoURL,
+    required this.role,
+  });
 
   Map<String, dynamic> toMap() {
     return {
@@ -19,11 +25,11 @@ class UserModel {
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
-      uid: map['uid'],
-      name: map['name'],
-      email: map['email'],
-      photoURL: map['photoURL'],
-      role: map['role'],
+      uid: map['uid'] ?? "", // ✅ Default empty string if null
+      name: map['name'] ?? "Unknown", // ✅ Default name if null
+      email: map['email'] ?? "", // ✅ Default empty email
+      photoURL: map['photoURL'] ?? "", // ✅ Default empty photo URL
+      role: map['role'] ?? "user", // ✅ Default role as "user"
     );
   }
 }
