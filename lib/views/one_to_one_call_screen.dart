@@ -1,14 +1,11 @@
 import 'dart:io';
-import 'dart:ui';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:permission_handler/permission_handler.dart';
-
 import '../services/agora_service.dart';
 
 
@@ -35,7 +32,7 @@ class _CallScreenState extends State<CallScreen> {
   bool _isVideoOn = true;
   bool _hasJoined = false;
   bool _isDisposed = false;
-  bool _callEnded = false; // To prevent multiple exits
+  bool _callEnded = false;
   late String _userId;
   bool isSharing = false;
   bool isSwitchingToScreenShare = false;
@@ -118,8 +115,6 @@ class _CallScreenState extends State<CallScreen> {
   }
 
 
-
-
   Future<void> _handlePermissions() async {
     Map<Permission, PermissionStatus> statuses = await [
       Permission.camera,
@@ -151,7 +146,6 @@ class _CallScreenState extends State<CallScreen> {
           });
         }
 
-        // **Ensure Agora updates accordingly**
         if (_isVideoOn) {
           print("📹 Remote user enabled video");
           _engine.muteLocalVideoStream(false); // Start sending video
@@ -164,9 +158,6 @@ class _CallScreenState extends State<CallScreen> {
       }
     });
   }
-
-
-
 
   void _listenForCallEnd() {
     FirebaseFirestore.instance
@@ -306,19 +297,6 @@ class _CallScreenState extends State<CallScreen> {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
   Future<void> stopScreenShare() async {
     try {
       await _engine.stopScreenCapture();
@@ -339,13 +317,6 @@ class _CallScreenState extends State<CallScreen> {
       print("❌ Error stopping screen share: $e");
     }
   }
-
-
-
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -427,7 +398,6 @@ class _CallScreenState extends State<CallScreen> {
     );
   }
 
-  /// **Default Video OFF UI**
   Widget _defaultVideoOffScreen() {
     return Container(
       width: double.infinity,
@@ -446,6 +416,4 @@ class _CallScreenState extends State<CallScreen> {
       ),
     );
   }
-
-
 }

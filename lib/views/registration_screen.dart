@@ -5,8 +5,8 @@ import '../../controllers/auth_controller.dart';
 class RegistrationScreen extends StatelessWidget {
   final AuthController authController = Get.put(AuthController());
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController emailPhoneController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +20,7 @@ class RegistrationScreen extends StatelessWidget {
             TextField(
               controller: nameController,
               decoration: InputDecoration(
-                labelText: "Name",
+                labelText: "Full Name",
                 border: OutlineInputBorder(),
               ),
             ),
@@ -28,23 +28,13 @@ class RegistrationScreen extends StatelessWidget {
 
             // Email or Phone Field
             TextField(
-              controller: emailPhoneController,
+              controller: phoneController,
               decoration: InputDecoration(
-                labelText: "Email or Phone Number",
+                labelText: "Phone Number",
                 border: OutlineInputBorder(),
               ),
             ),
-            SizedBox(height: 10),
 
-            // Password Field
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: "Password",
-                border: OutlineInputBorder(),
-              ),
-            ),
             SizedBox(height: 20),
 
             // Submit Button
@@ -52,8 +42,8 @@ class RegistrationScreen extends StatelessWidget {
               onPressed: () {
                 authController.registerUser(
                   nameController.text.trim(),
-                  emailPhoneController.text.trim(),
-                  passwordController.text.trim(),
+                  phoneController.text.trim(),
+
                 );
               },
               child: Text("Submit"),

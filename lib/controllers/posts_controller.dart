@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import '../models/post_model.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class PostsController extends GetxController {
   RxList<PostModel> posts = <PostModel>[].obs;
@@ -14,9 +15,10 @@ class PostsController extends GetxController {
   RxString searchQuery = "".obs;
   Dio dio = Dio();
 
-  // ✅ Fix: Ensure Key & IV are consistent
-  final encrypt.Key encryptionKey = encrypt.Key.fromUtf8('12345678901234567890123456789012'); // 32-byte AES key
-  final encrypt.IV iv = encrypt.IV.fromUtf8('1234567890123456'); // 16-byte IV
+
+  final encryptionKey = encrypt.Key.fromUtf8(dotenv.env['ENCRYPTION_KEY'] ?? '');
+  final iv = encrypt.IV.fromUtf8(dotenv.env['ENCRYPTION_IV'] ?? '');
+
 
   @override
   void onInit() {
@@ -48,18 +50,18 @@ class PostsController extends GetxController {
 
   void filterPosts(String query) {
     if (query.isEmpty) {
-      filteredPosts.value = List.from(posts); // ✅ Ensure UI updates properly
+      filteredPosts.value = List.from(posts);
     } else {
       filteredPosts.value = posts
           .where((post) =>
           post.fileName.toLowerCase().contains(query.toLowerCase()))
-          .toList(); // ✅ Convert to List
+          .toList();
     }
   }
 
   void filterByFileType(String fileType) {
     selectedFileType.value = fileType;
-    applyFilters(); // ✅ Apply both filters
+    applyFilters();
   }
 
   void applyFilters() {
@@ -81,10 +83,10 @@ class PostsController extends GetxController {
       Directory appDir = await getApplicationDocumentsDirectory();
       String filePath = "${appDir.path}/${post.fileName}";
 
-      // ✅ Step 1: Download file
+
       await dio.download(post.fileUrl, filePath);
 
-      // ✅ Step 2: Encrypt file with PKCS7 Padding
+
       File downloadedFile = File(filePath);
       List<int> fileBytes = await downloadedFile.readAsBytes();
 
@@ -95,7 +97,7 @@ class PostsController extends GetxController {
       final encrypted = encrypter.encryptBytes(fileBytes, iv: iv);
       await downloadedFile.writeAsBytes(encrypted.bytes);
 
-      // ✅ Step 3: Update Firestore with local path using `post.uploadId`
+
       await FirebaseFirestore.instance.collection('uploads').doc(post.uploadId).update({
         'localPath': filePath,
       });

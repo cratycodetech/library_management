@@ -39,14 +39,14 @@ Future<void> requestNotificationPermission() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await dotenv.load(fileName: ".env"); // ✅ Load .env file
+    await dotenv.load(fileName: ".env");
   } catch (e) {
     print("❌ Error loading .env file: $e");
   }
   await FirebaseService.init();
   await Supabase.initialize(
-    url: 'https://utomiwubfeyxyfkkmril.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0b21pd3ViZmV5eHlma2ttcmlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5NjAyNjIsImV4cCI6MjA1NTUzNjI2Mn0.faDiJ988isqsYLJqj39N_8nLfLjGjIayh1z_JOTYos8',  // 🔹 Replace with your API Key
+    url:  dotenv.env['SUPABASE_URL'] ?? '',
+    anonKey: dotenv.env['SUPABASE_ANONKEY'] ?? '',
   );
 
   await FlutterDownloader.initialize(

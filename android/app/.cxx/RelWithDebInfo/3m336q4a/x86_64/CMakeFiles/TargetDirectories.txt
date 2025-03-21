@@ -1,0 +1,2 @@
+H:/Craftycode/App/android/library/android/app/.cxx/RelWithDebInfo/3m336q4a/x86_64/CMakeFiles/edit_cache.dir
+H:/Craftycode/App/android/library/android/app/.cxx/RelWithDebInfo/3m336q4a/x86_64/CMakeFiles/rebuild_cache.dir

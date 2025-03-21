@@ -8,13 +8,28 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.view.WindowManager
+import io.flutter.embedding.android.FlutterFragmentActivity
+import com.facebook.FacebookSdk
+import com.facebook.appevents.AppEventsLogger
 
-class MainActivity: FlutterActivity() {
+class MainActivity: FlutterFragmentActivity() {
     private val CHANNEL_FILE_PROVIDER = "file_provider"
     private val CHANNEL_SCREEN_PROTECTION = "screen_protection"
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Initialize Facebook SDK properly
+        FacebookSdk.sdkInitialize(applicationContext)
+        FacebookSdk.setApplicationId("608107158879108")  // Replace with your actual Facebook App ID
+        FacebookSdk.setClientToken("7587669b642cb9b541bf7e289a43e310")  // Your Facebook Client Token
+        AppEventsLogger.activateApp(application)
+    }
+
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
 
         // File Provider Channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_FILE_PROVIDER).setMethodCallHandler { call, result ->

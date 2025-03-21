@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
-import 'package:open_filex/open_filex.dart'; // ✅ Added package to open files
+import 'package:open_filex/open_filex.dart';
 import '../models/post_model.dart';
 
 class PostDetailScreen extends StatelessWidget {
@@ -12,9 +13,10 @@ class PostDetailScreen extends StatelessWidget {
 
   PostDetailScreen({Key? key, required this.post}) : super(key: key);
 
-  // ✅ Ensure Key & IV match encryption process
-  final encrypt.Key encryptionKey = encrypt.Key.fromUtf8('12345678901234567890123456789012'); // 32-byte AES key
-  final encrypt.IV iv = encrypt.IV.fromUtf8('1234567890123456'); // 16-byte IV
+
+  final encrypt.Key encryptionKey = encrypt.Key.fromUtf8(dotenv.env['ENCRYPTION_KEY'] ?? '');
+  final encrypt.IV iv = encrypt.IV.fromUtf8(dotenv.env['ENCRYPTION_IV'] ?? '');
+
 
   Future<void> decryptAndOpenFile() async {
     try {
@@ -28,24 +30,24 @@ class PostDetailScreen extends StatelessWidget {
         return;
       }
 
-      // ✅ Read encrypted file bytes
+
       Uint8List encryptedBytes = await encryptedFile.readAsBytes();
 
-      // ✅ Ensure same encryption settings are used
+
       final encrypter = encrypt.Encrypter(
         encrypt.AES(encryptionKey, mode: encrypt.AESMode.cbc, padding: "PKCS7"),
       );
 
-      // ✅ Decrypt the file
+
       List<int> decryptedBytes = encrypter.decryptBytes(encrypt.Encrypted(encryptedBytes), iv: iv);
 
-      // ✅ Write decrypted file
+
       File decryptedFile = File(decryptedFilePath);
       await decryptedFile.writeAsBytes(decryptedBytes);
 
       Get.snackbar("Success", "File decrypted! Opening now...");
 
-      // ✅ Open the decrypted file
+
       OpenFilex.open(decryptedFilePath);
     } catch (e) {
       Get.snackbar("Error", "Failed to decrypt and open file. ${e.toString()}");
@@ -70,7 +72,7 @@ class PostDetailScreen extends StatelessWidget {
             )
                 : ElevatedButton(
               onPressed: () {
-                OpenFilex.open(post.fileUrl); // ✅ Directly open non-premium file
+                OpenFilex.open(post.fileUrl);
               },
               child: Text("Open File"),
             ),

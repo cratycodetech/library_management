@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -25,6 +26,7 @@ class AuthController extends GetxController {
   RxString tempName = "".obs;
   RxString tempEmailOrPhone = "".obs;
   RxString tempPassword = "".obs;
+  String? verificationId;
 
   @override
   void onInit() {
@@ -105,39 +107,59 @@ class AuthController extends GetxController {
 
 
 
-  void registerUser(String name, String emailOrPhone, String password) {
+
+
+  void registerUser(String name, String phone) async {
     String? nameError = Validators.validateName(name);
-    String? emailPhoneError = Validators.validateEmailOrPhone(emailOrPhone);
-    String? passwordError = Validators.validatePassword(password);
+    String? phoneError = Validators.validateEmailOrPhone(phone);
 
     if (nameError != null) {
       Get.snackbar("Error", nameError);
       return;
     }
-    if (emailPhoneError != null) {
-      Get.snackbar("Error", emailPhoneError);
-      return;
-    }
-    if (passwordError != null) {
-      Get.snackbar("Error", passwordError);
+    if (phoneError != null) {
+      Get.snackbar("Error", phoneError);
       return;
     }
 
-    // ✅ Store the user details temporarily
+    // ✅ Format Bangladesh number
+    String formattedPhone = phone.trim();
+
+    if (formattedPhone.startsWith("0")) {
+      formattedPhone = "+880" + formattedPhone.substring(1);
+    } else if (!formattedPhone.startsWith("+880")) {
+      formattedPhone = "+880$formattedPhone";
+    }
+
+    // ✅ Store user details temporarily
     tempName.value = name;
-    tempEmailOrPhone.value = emailOrPhone;
-    tempPassword.value = password;
+    tempEmailOrPhone.value = formattedPhone;
 
-    // ✅ Generate OTP
-    String otp = _generateOtp();
-    generatedOtp.value = otp;
+    // ✅ Send OTP via Firebase
+    FirebaseAuth auth = FirebaseAuth.instance;
 
-    // ✅ Send OTP via email
-    sendOtpToEmail(emailOrPhone, otp);
+    await auth.verifyPhoneNumber(
+      phoneNumber: formattedPhone,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        await auth.signInWithCredential(credential);
+        print("Phone automatically verified!");
 
-    // ✅ Navigate to OTP screen (No need to pass user info)
-    Get.toNamed("/otp");
+        // You can store user data in Firestore or database now if needed
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        Get.snackbar("Error", "Verification failed: ${e.message}");
+      },
+      codeSent: (String verId, int? resendToken) {
+        verificationId = verId;
+        Get.toNamed("/otp");
+      },
+      codeAutoRetrievalTimeout: (String verId) {
+        verificationId = verId;
+      },
+    );
   }
+
+
 
   // ✅ Generate a 6-digit OTP
   String _generateOtp() {
@@ -222,6 +244,39 @@ class AuthController extends GetxController {
       Get.snackbar("Error", "Invalid credentials. Please try again.");
     }
   }
+
+
+  Future<void> signInWithFacebook() async {
+    try {
+      final LoginResult result = await FacebookAuth.instance.login(
+        permissions: ['public_profile'],
+      );
+
+      if (result.status == LoginStatus.success) {
+        final AccessToken accessToken = result.accessToken!;
+        final OAuthCredential credential =
+        FacebookAuthProvider.credential(accessToken.tokenString);
+
+        // Sign in with Firebase
+        UserCredential userCredential =
+        await FirebaseAuth.instance.signInWithCredential(credential);
+        User? user = userCredential.user;
+
+        if (user != null) {
+          await _saveUserToFirestore(user);
+          await fetchUserDetails();
+          Get.offAll(() => HomeScreen());
+        }
+      } else {
+        SnackbarService.showError("Facebook Login Failed: ${result.message}");
+      }
+    } catch (e) {
+      SnackbarService.showError("Error during Facebook Login: $e");
+      print("Error during Facebook Login: $e");
+    }
+  }
+
+
 
 
 }

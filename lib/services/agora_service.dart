@@ -4,7 +4,8 @@ import 'package:http/http.dart' as http;
 
 class AgoraService {
   RtcEngine? _engine;
-  final String serverUrl = "http://192.168.0.102:3000/agora/generateToken";
+  final String serverUrl = "http://192.168.0.100:3000/agora/generateToken";
+
 
   /// Generates an Agora Token from the backend server
   Future<String> generateToken(String channelName, int uid) async {

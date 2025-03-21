@@ -48,6 +48,13 @@ class LoginScreen extends StatelessWidget {
                 },
                 child: Text("Sign in with Google"),
               ),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: () {
+                  authController.signInWithFacebook();
+                },
+                child: Text("Sign in with Facebook"),
+              ),
               SizedBox(height: 20), // Space between buttons
               ElevatedButton(
                 onPressed: () {
@@ -55,12 +62,14 @@ class LoginScreen extends StatelessWidget {
                 },
                 child: Text("Show Notification"),
               ),
+
               ElevatedButton(
                 onPressed: () {
                   Get.toNamed(AppRoutes.registrationScreen);
                 },
                 child: Text("Sign up"),
               ),
+
             ],
           ),
         ),

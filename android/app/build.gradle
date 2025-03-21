@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.library_app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion "28.0.13004108"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -42,6 +42,10 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies{
+    implementation 'com.facebook.android:facebook-login:latest.release'
 }
 
 apply plugin: 'com.google.gms.google-services'

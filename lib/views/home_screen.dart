@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:library_app/views/pdf_reader_screen.dart';
 import 'package:library_app/views/widgets/bottomNavigationBar_widget.dart';
 import '../controllers/auth_controller.dart';
 import '../routes/routes.dart';
@@ -61,6 +62,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   },
                   child: Text("See post"),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Get.to(() => PdfReaderScreen());
+                  },
+                  child: Text("Read PDF"),
                 ),
               ],
             );
