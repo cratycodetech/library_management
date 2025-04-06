@@ -1,23 +1,29 @@
 import 'package:get/get.dart';
+import 'package:library_app/views/Audiobook/audio_chapter_screen.dart';
+import 'package:library_app/views/Audiobook/audio_detail_screen.dart';
+import 'package:library_app/views/Audiobook/audio_player_screen.dart';
+import 'package:library_app/views/Authentication/forget_password_screen.dart';
+import 'package:library_app/views/Authentication/update_pass_screen.dart';
+import 'package:library_app/views/library_home_screen.dart';
 import '../bindings/pdf_annotation_binding.dart';
 import '../bindings/posting_binding.dart';
 import '../bindings/posts_binding.dart';
+import '../views/Authentication/login_register_screen.dart';
+import '../views/Authentication/login_screen.dart';
+import '../views/Authentication/otp_screen.dart';
+import '../views/Authentication/registration_screen.dart';
 import '../views/all_people_screen.dart';
 import '../views/create_group_screen.dart';
 import '../views/image_download_screen.dart';
 import '../views/one_to_one_call_screen.dart';
 import '../views/one_to_one_chat_screen.dart';
-import '../views/otp_screen.dart';
 import '../views/posting_screen.dart';
 import '../views/posts_screen.dart';
-import '../views/registration_screen.dart';
 import '../views/video_download_screen.dart';
 import '../views/group_call_screen.dart';
 import '../views/group_chat_screen.dart';
 import '../views/group_list_screen.dart';
-
 import '../views/home_screen.dart';
-import '../views/login_screen.dart';
 import '../bindings/auth_binding.dart';
 import '../views/pdf_viewer_screen.dart';
 import '../views/widgets/select_chat_widget.dart';
@@ -43,6 +49,14 @@ class AppRoutes {
   static const String postsScreen = '/posts';
   static const String registrationScreen = '/registration';
   static const String otpScreen = '/otp';
+  static const String loginRegister = '/login-register';
+  static const String forgetPassword = '/forget-password';
+  static const String updatePassword = '/update-password';
+  static const String libraryHomeScreen = '/library-home-screen';
+  static const String audioDetailScreen = '/audio-Detail-screen';
+  static const String audioChapterScreen = '/audio-Chapter-screen';
+  static const String audioPlayerScreen = '/audio-player-screen';
+
   static List<GetPage> pages = [
     GetPage(
       name: login,
@@ -166,5 +180,40 @@ class AppRoutes {
       name: otpScreen, // Added select-chat page
       page: () => OtpScreen(),
     ),
+    GetPage(
+      name: loginRegister,
+      page: () => const LoginRegisterScreen(),
+    ),
+
+    GetPage(
+      name: forgetPassword,
+      page: () => const ForgetPasswordScreen(),
+    ),
+
+    GetPage(
+      name: updatePassword,
+      page: () => const UpdatePassScreen(),
+    ),
+
+    GetPage(
+      name: libraryHomeScreen,
+      page: () => const LibraryHomeScreen(),
+    ),
+
+    GetPage(
+      name: audioDetailScreen,
+      page: () => const AudioDetailScreen(),
+    ),
+
+    GetPage(
+      name: audioChapterScreen,
+      page: () => const AudioChapterScreen(),
+    ),
+
+    GetPage(
+      name: audioPlayerScreen,
+      page: () => const AudioPlayerScreen(),
+    ),
+
   ];
 }

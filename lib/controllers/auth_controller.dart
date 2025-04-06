@@ -4,16 +4,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mailer/mailer.dart' as mailer;
 import 'package:mailer/smtp_server/gmail.dart';
+import 'package:twitter_login/twitter_login.dart';
 import '../models/user_model.dart';
 import '../services/snackbar_service.dart';
 import '../utils/validators.dart';
+import '../views/Authentication/login_screen.dart';
 import '../views/home_screen.dart';
-import '../views/login_screen.dart';
+
 
 class AuthController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -76,6 +77,7 @@ class AuthController extends GetxController {
       }
     } catch (e) {
       SnackbarService.showError("Google Sign-In Failed: ${e.toString()}");
+      print("Google Sign-In Failed: ${e.toString()}");
     }
   }
 
@@ -109,63 +111,50 @@ class AuthController extends GetxController {
 
 
 
-  void registerUser(String name, String phone) async {
+  void registerUser(String name, String email, String password) async {
     String? nameError = Validators.validateName(name);
-    String? phoneError = Validators.validateEmailOrPhone(phone);
+    String? emailError = Validators.validateEmailOrPhone(email);
+    String? passwordError = Validators.validatePassword(password);
 
     if (nameError != null) {
       Get.snackbar("Error", nameError);
       return;
     }
-    if (phoneError != null) {
-      Get.snackbar("Error", phoneError);
+    if (emailError != null) {
+      Get.snackbar("Error", emailError);
+      return;
+    }
+    if (passwordError != null) {
+      Get.snackbar("Error", passwordError);
       return;
     }
 
-    // ✅ Format Bangladesh number
-    String formattedPhone = phone.trim();
-
-    if (formattedPhone.startsWith("0")) {
-      formattedPhone = "+880" + formattedPhone.substring(1);
-    } else if (!formattedPhone.startsWith("+880")) {
-      formattedPhone = "+880$formattedPhone";
-    }
-
-    // ✅ Store user details temporarily
+    // ✅ Store user data temporarily
     tempName.value = name;
-    tempEmailOrPhone.value = formattedPhone;
+    tempEmailOrPhone.value = email;
+    tempPassword.value = password;
 
-    // ✅ Send OTP via Firebase
-    FirebaseAuth auth = FirebaseAuth.instance;
+    // ✅ Generate and send OTP
+    String otp = generateOtp();
+    generatedOtp.value = otp;
 
-    await auth.verifyPhoneNumber(
-      phoneNumber: formattedPhone,
-      verificationCompleted: (PhoneAuthCredential credential) async {
-        await auth.signInWithCredential(credential);
-        print("Phone automatically verified!");
+    await sendOtpToEmail(email, otp);
 
-        // You can store user data in Firestore or database now if needed
-      },
-      verificationFailed: (FirebaseAuthException e) {
-        Get.snackbar("Error", "Verification failed: ${e.message}");
-      },
-      codeSent: (String verId, int? resendToken) {
-        verificationId = verId;
-        Get.toNamed("/otp");
-      },
-      codeAutoRetrievalTimeout: (String verId) {
-        verificationId = verId;
-      },
-    );
+    // ✅ Navigate to OTP screen
+    Get.toNamed("/otp");
   }
 
 
 
-  // ✅ Generate a 6-digit OTP
-  String _generateOtp() {
+
+
+  // ✅ Generate a 5-digit OTP
+  String generateOtp() {
     Random random = Random();
-    return (100000 + random.nextInt(900000)).toString();
+    return (10000 + random.nextInt(90000)).toString(); // generates 10000–99999
   }
+
+
 
   // ✅ Send OTP via Email using .env credentials
   Future<void> sendOtpToEmail(String email, String otp) async {
@@ -187,20 +176,31 @@ class AuthController extends GetxController {
   }
 
 
-  void verifyOtp(String enteredOtp) {
+  void verifyOtp(String enteredOtp, {bool fromForgetPass = false, String? emailForReset}) {
     if (enteredOtp.isEmpty) {
       Get.snackbar("Error", "Please enter the OTP.");
       return;
     }
 
     if (enteredOtp == generatedOtp.value) {
-      _storeUserAfterOtp();
       Get.snackbar("Success", "OTP Verified Successfully!");
-      Get.offAllNamed("/login");
+
+      if (fromForgetPass) {
+        Get.snackbar("Success", "OTP Verified Successfully!");
+        Get.offAllNamed("/update-password", arguments: {
+          "email": emailForReset,
+        });
+        return;
+      } else {
+        // Continue with registration
+        _storeUserAfterOtp();
+        Get.offAllNamed("/home");
+      }
     } else {
       Get.snackbar("Error", "Invalid OTP. Please try again.");
     }
   }
+
 
   Future<void> _storeUserAfterOtp() async {
     try {
@@ -276,6 +276,114 @@ class AuthController extends GetxController {
     }
   }
 
+
+
+
+
+  Future<void> signInWithTwitter() async {
+    try {
+      final twitterLogin = TwitterLogin(
+        apiKey: dotenv.env['TWITTER_API_KEY'] ?? '',
+        apiSecretKey: dotenv.env['TWITTER_API_SECRET'] ?? '',
+        redirectURI: dotenv.env['TWITTER_REDIRECT_URI'] ?? '',
+      );
+
+      final authResult = await twitterLogin.login();
+
+      if (authResult.status == TwitterLoginStatus.loggedIn) {
+        final twitterAuthCredential = TwitterAuthProvider.credential(
+          accessToken: authResult.authToken!,
+          secret: authResult.authTokenSecret!,
+        );
+
+        final userCredential = await FirebaseAuth.instance.signInWithCredential(twitterAuthCredential);
+        final user = userCredential.user;
+
+        if (user != null) {
+          await _saveUserToFirestore(user);
+          await fetchUserDetails();
+          Get.offAll(() => HomeScreen());
+        }
+      } else if (authResult.status == TwitterLoginStatus.cancelledByUser) {
+        SnackbarService.showError("Twitter login cancelled.");
+      } else {
+        SnackbarService.showError("Twitter login failed: ${authResult.errorMessage}");
+      }
+    } catch (e) {
+      print("Twitter login error: $e");
+      SnackbarService.showError("Twitter login error: $e");
+    }
+  }
+
+
+  void sendResetOtp(String email) async {
+    String? emailError = Validators.validateEmailOrPhone(email);
+    if (emailError != null) {
+      Get.snackbar("Error", emailError);
+      return;
+    }
+
+    try {
+      final querySnapshot = await _firestore
+          .collection("users")
+          .where("email", isEqualTo: email) // 🛠 Corrected field
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        Get.snackbar("Error", "This email is not registered.");
+        return;
+      }
+
+      tempEmailOrPhone.value = email;
+      String otp = generateOtp();
+      generatedOtp.value = otp;
+
+      await sendOtpToEmail(email, otp);
+
+      Get.toNamed("/otp", arguments: {
+        "fromForgetPass": true,
+        "email": email,
+      });
+    } catch (e) {
+      print("Error checking email in Firestore: $e");
+      Get.snackbar("Error", "Something went wrong. Please try again.");
+    }
+  }
+
+  Future<void> updateUserPassword(String email, String newPassword) async {
+    try {
+      // Get user with this email from Firestore
+      final querySnapshot = await _firestore
+          .collection("users")
+          .where("email", isEqualTo: email)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        Get.snackbar("Error", "No user found with this email.");
+        return;
+      }
+
+      final userDoc = querySnapshot.docs.first;
+      final uid = userDoc.id;
+
+      // 🔐 Update the custom password field in Firestore
+      await _firestore.collection("users").doc(uid).set(
+        {
+          "secret": newPassword, // custom field, not used by Firebase Auth
+          "updatedAt": DateTime.now(),
+        },
+        SetOptions(merge: true),
+      );
+
+      Get.snackbar("Success", "Password updated successfully.");
+      Get.offAllNamed("/login");
+    } catch (e) {
+      print("Firestore password update failed: $e");
+      Get.snackbar("Error", "Something went wrong. ${e.toString()}");
+    }
+  }
 
 
 

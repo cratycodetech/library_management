@@ -1,0 +1,2 @@
+/Users/air/Desktop/library/library_management/android/app/.cxx/Debug/36206b4x/x86/CMakeFiles/edit_cache.dir
+/Users/air/Desktop/library/library_management/android/app/.cxx/Debug/36206b4x/x86/CMakeFiles/rebuild_cache.dir
