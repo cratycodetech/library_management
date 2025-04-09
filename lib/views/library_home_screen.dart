@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart'; // <- Make sure this is added
+import 'package:library_app/views/study_room/room_list.dart';
+import 'package:library_app/views/study_room/widgets/main_scaffold.dart';
+import 'package:library_app/views/video/video_tab.dart';
 import 'Audiobook/audio_tab.dart';
+import 'Pdf/pdf_tab.dart';
 
 class LibraryHomeScreen extends StatefulWidget {
   const LibraryHomeScreen({Key? key}) : super(key: key);
@@ -10,6 +15,7 @@ class LibraryHomeScreen extends StatefulWidget {
 
 class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   String selectedTab = "AUDIO";
+  int _currentIndex = 0; // ✅ Added this line
 
   Widget _buildTab(String label) {
     final bool isSelected = label == selectedTab;
@@ -46,9 +52,9 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
       case "AUDIO":
         return const AudioTab();
       case "PDF":
-        return const Center(child: Text("PDF Content"));
+        return PdfTab();
       case "VIDEO":
-        return const Center(child: Text("Video Content"));
+        return VideoTab();
       default:
         return const SizedBox.shrink();
     }
@@ -56,7 +62,8 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return MainScaffold(
+      currentIndex: 0,
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.black,
@@ -67,8 +74,6 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
       body: Column(
         children: [
           const SizedBox(height: 12),
-
-          // Custom Tab Bar (AUDIO, PDF, VIDEO)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Container(
@@ -88,25 +93,11 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 2),
-
-          // Dynamic Tab Content
           Expanded(child: _getSelectedTabWidget()),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        selectedItemColor: Colors.black,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.book), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: ''),
         ],
       ),
     );
   }
+
 }

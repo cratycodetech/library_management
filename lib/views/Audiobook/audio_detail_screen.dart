@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
+
+import '../../routes/routes.dart';
 
 class AudioDetailScreen extends StatelessWidget {
   const AudioDetailScreen({super.key});
@@ -77,9 +81,9 @@ class AudioDetailScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _tab("About", isSelected: true),
-                _tab("Chapter"),
-                _tab("Reviews"),
+                _tab("About", 0, isSelected: true),
+                _tab("Chapter", 1),
+                _tab("Reviews", 2),
               ],
             ),
           ),
@@ -190,19 +194,37 @@ class AudioDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _tab(String title, {bool isSelected = false}) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8), // ⬅️ Space between tabs
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12), // ⬅️ Wider & taller
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.black : Colors.grey[300],
-        borderRadius: BorderRadius.circular(32), // Optional: More rounded
-      ),
-      child: Text(
-        title,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.black,
-          fontWeight: FontWeight.w500,
+  Widget _tab(String title, int index,{bool isSelected = false}) {
+
+    return GestureDetector(
+    onTap: () {
+      switch (index) {
+        case 0:
+          Get.toNamed(AppRoutes.audioDetailScreen);
+          break;
+        case 1:
+          Get.toNamed(AppRoutes.audioChapterScreen);
+          break;
+        case 2:
+          Get.toNamed(AppRoutes.audioReviewScreen);
+          break;
+        default:
+          break;
+      }
+    },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8), // ⬅️ Space between tabs
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12), // ⬅️ Wider & taller
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.black : Colors.grey[300],
+          borderRadius: BorderRadius.circular(32), // Optional: More rounded
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );

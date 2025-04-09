@@ -46,7 +46,7 @@ class _SelectChatScreenState extends State<SelectChatScreen> {
         .add(messageData);
 
     // Navigate to the selected group chat
-    Get.to(() => GroupChatScreen(groupId: groupId, groupName: groupName));
+    // Get.to(() => GroupChatScreen(groupId: groupId, groupName: groupName));
   }
 
   @override

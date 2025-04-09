@@ -2,9 +2,17 @@ import 'package:get/get.dart';
 import 'package:library_app/views/Audiobook/audio_chapter_screen.dart';
 import 'package:library_app/views/Audiobook/audio_detail_screen.dart';
 import 'package:library_app/views/Audiobook/audio_player_screen.dart';
+import 'package:library_app/views/Audiobook/audio_review_screen.dart';
+import 'package:library_app/views/Audiobook/submit_review_screen.dart';
 import 'package:library_app/views/Authentication/forget_password_screen.dart';
 import 'package:library_app/views/Authentication/update_pass_screen.dart';
+import 'package:library_app/views/Pdf/pdf_chapter_screen.dart';
+import 'package:library_app/views/Pdf/pdf_detail_screen.dart';
+import 'package:library_app/views/Pdf/pdf_reading_screen.dart';
 import 'package:library_app/views/library_home_screen.dart';
+import 'package:library_app/views/study_room/group_info_screen.dart';
+import 'package:library_app/views/video/video_chapter_screen.dart';
+import 'package:library_app/views/video/video_details_screen.dart';
 import '../bindings/pdf_annotation_binding.dart';
 import '../bindings/posting_binding.dart';
 import '../bindings/posts_binding.dart';
@@ -19,6 +27,7 @@ import '../views/one_to_one_call_screen.dart';
 import '../views/one_to_one_chat_screen.dart';
 import '../views/posting_screen.dart';
 import '../views/posts_screen.dart';
+import '../views/study_room/group_chat_screen.dart';
 import '../views/video_download_screen.dart';
 import '../views/group_call_screen.dart';
 import '../views/group_chat_screen.dart';
@@ -56,6 +65,15 @@ class AppRoutes {
   static const String audioDetailScreen = '/audio-Detail-screen';
   static const String audioChapterScreen = '/audio-Chapter-screen';
   static const String audioPlayerScreen = '/audio-player-screen';
+  static const String audioReviewScreen = '/audio-review-screen';
+  static const String submitReviewScreen = '/submit-review-screen';
+  static const String pdfDetailScreen = '/pdf-Detail-screen';
+  static const String pdfChapterScreen = '/pdf-Chapter-screen';
+  static const String pdfReadingScreen = '/pdf-Reading-screen';
+  static const String videoDetailScreen = '/video-Detail-screen';
+  static const String videoChapterScreen = '/video-Chapter-screen';
+  static const String groupChatScreen = '/group-chat-screen';
+  static const String groupInfoScreen = '/group-info-screen';
 
   static List<GetPage> pages = [
     GetPage(
@@ -72,16 +90,16 @@ class AppRoutes {
       name: createGroup,
       page: () => CreateGroupScreen(),
     ),
-    GetPage(
-      name: groupChat,
-      page: () {
-        final args = Get.arguments as Map<String, dynamic>? ?? {};
-        return GroupChatScreen(
-          groupId: args["groupId"] ?? "",
-          groupName: args["groupName"] ?? "Unknown Group",
-        );
-      },
-    ),
+    // GetPage(
+    //   name: groupChat,
+    //   page: () {
+    //     final args = Get.arguments as Map<String, dynamic>? ?? {};
+    //     return GroupChatScreen(
+    //       groupId: args["groupId"] ?? "",
+    //       groupName: args["groupName"] ?? "Unknown Group",
+    //     );
+    //   },
+    // ),
     GetPage(
       name: groupList,
       page: () => GroupListScreen(),
@@ -214,6 +232,51 @@ class AppRoutes {
       name: audioPlayerScreen,
       page: () => const AudioPlayerScreen(),
     ),
+
+    GetPage(
+      name: audioReviewScreen,
+      page: () => const AudioReviewScreen(),
+    ),
+
+    GetPage(
+      name: submitReviewScreen,
+      page: () => const SubmitReviewScreen(),
+    ),
+    GetPage(
+      name: pdfDetailScreen,
+      page: () => const PdfDetailScreen(),
+    ),
+
+    GetPage(
+      name: pdfChapterScreen,
+      page: () => const PdfChapterScreen(),
+    ),
+
+    GetPage(
+      name: pdfReadingScreen,
+      page: () => const PdfReadingScreen(),
+    ),
+
+    GetPage(
+      name: videoDetailScreen,
+      page: () => const VideoDetailsScreen(),
+    ),
+
+    GetPage(
+      name: videoChapterScreen,
+      page: () => const VideoChapterScreen(),
+    ),
+
+    GetPage(
+      name: groupChatScreen,
+      page: () => GroupChatScreen(),
+    ),
+
+    GetPage(
+      name: groupInfoScreen,
+      page: () => GroupInfoScreen(),
+    ),
+
 
   ];
 }

@@ -10,6 +10,7 @@ import 'package:mailer/mailer.dart' as mailer;
 import 'package:mailer/smtp_server/gmail.dart';
 import 'package:twitter_login/twitter_login.dart';
 import '../models/user_model.dart';
+import '../routes/routes.dart';
 import '../services/snackbar_service.dart';
 import '../utils/validators.dart';
 import '../views/Authentication/login_screen.dart';
@@ -73,7 +74,7 @@ class AuthController extends GetxController {
       if (user != null) {
         await _saveUserToFirestore(user);
         await fetchUserDetails(); // Ensure user details are fetched immediately
-        Get.offAll(() => HomeScreen());
+        Get.toNamed(AppRoutes.home);
       }
     } catch (e) {
       SnackbarService.showError("Google Sign-In Failed: ${e.toString()}");
@@ -238,7 +239,7 @@ class AuthController extends GetxController {
   Future<void> loginWithEmailAndPassword(String emailOrPhone, String password) async {
     try {
       await _auth.signInWithEmailAndPassword(email: emailOrPhone, password: password);
-      Get.offAllNamed("/home");
+      Get.toNamed(AppRoutes.libraryHomeScreen);
     } catch (e) {
       print("Login failed: $e");
       Get.snackbar("Error", "Invalid credentials. Please try again.");

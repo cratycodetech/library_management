@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
+
+import '../../routes/routes.dart';
 
 class AudioTab extends StatelessWidget {
   const AudioTab({super.key});
@@ -184,7 +188,9 @@ class AudioTab extends StatelessWidget {
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              onPressed: () {},
+              onPressed: () {
+                Get.toNamed(AppRoutes.audioDetailScreen);
+              },
               child: const Center(
                 child: Text(
                   "Continue Listening",

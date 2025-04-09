@@ -55,6 +55,9 @@ dependencies:
   pin_code_fields: ^8.0.0
   font_awesome_flutter: ^10.5.0
   twitter_login: ^4.4.2
+  flutter_screenutil: ^5.9.3
+  smooth_page_indicator: ^1.2.1
+  chewie: ^1.7.0
 
 
 dev_dependencies:

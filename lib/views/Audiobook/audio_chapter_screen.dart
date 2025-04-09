@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
+
+import '../../routes/routes.dart';
 
 class AudioChapterScreen extends StatefulWidget {
   const AudioChapterScreen({super.key});
@@ -83,9 +87,9 @@ class _AudioChapterScreenState extends State<AudioChapterScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _tab("About"),
-                _tab("Chapter", isSelected: true),
-                _tab("Reviews"),
+                _tab("About",0),
+                _tab("Chapter",1, isSelected: true),
+                _tab("Reviews",2),
               ],
             ),
           ),
@@ -113,37 +117,42 @@ class _AudioChapterScreenState extends State<AudioChapterScreen> {
               itemCount: 5,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemBuilder: (context, index) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Row(
-                    children: [
-                      const CircleAvatar(
-                        backgroundColor: Colors.grey,
-                        child: Icon(Icons.person, color: Colors.white),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(height: 10, width: 140, color: Colors.grey[300]),
-                            const SizedBox(height: 6),
-                            Container(height: 8, width: 100, color: Colors.grey[300]),
-                          ],
+                return GestureDetector(
+                  onTap: () {
+                    Get.toNamed(AppRoutes.audioPlayerScreen);
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          backgroundColor: Colors.grey,
+                          child: Icon(Icons.person, color: Colors.white),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        index == 2 || index > 2 ? Icons.lock : Icons.play_circle,
-                        color: index == 2 || index > 2 ? Colors.grey : Colors.black,
-                        size: 28,
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(height: 10, width: 140, color: Colors.grey[300]),
+                              const SizedBox(height: 6),
+                              Container(height: 8, width: 100, color: Colors.grey[300]),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(
+                          index == 2 || index > 2 ? Icons.lock : Icons.play_circle,
+                          color: index == 2 || index > 2 ? Colors.grey : Colors.black,
+                          size: 28,
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -186,19 +195,36 @@ class _AudioChapterScreenState extends State<AudioChapterScreen> {
     );
   }
 
-  Widget _tab(String title, {bool isSelected = false}) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8), // ⬅️ Space between tabs
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12), // ⬅️ Wider & taller
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.black : Colors.grey[300],
-        borderRadius: BorderRadius.circular(32), // Optional: More rounded
-      ),
-      child: Text(
-        title,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.black,
-          fontWeight: FontWeight.w500,
+  Widget _tab(String title, int index,{bool isSelected = false}) {
+    return GestureDetector(
+      onTap: () {
+        switch (index) {
+          case 0:
+            Get.toNamed(AppRoutes.audioDetailScreen);
+            break;
+          case 1:
+            Get.toNamed(AppRoutes.audioChapterScreen);
+            break;
+          case 2:
+            Get.toNamed(AppRoutes.audioReviewScreen);
+            break;
+          default:
+            break;
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8), // ⬅️ Space between tabs
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12), // ⬅️ Wider & taller
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.black : Colors.grey[300],
+          borderRadius: BorderRadius.circular(32), // Optional: More rounded
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
