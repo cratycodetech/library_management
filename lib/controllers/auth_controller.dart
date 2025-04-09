@@ -239,7 +239,7 @@ class AuthController extends GetxController {
   Future<void> loginWithEmailAndPassword(String emailOrPhone, String password) async {
     try {
       await _auth.signInWithEmailAndPassword(email: emailOrPhone, password: password);
-      Get.toNamed(AppRoutes.libraryHomeScreen);
+      Get.toNamed(AppRoutes.home);
     } catch (e) {
       print("Login failed: $e");
       Get.snackbar("Error", "Invalid credentials. Please try again.");

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
-
+import 'controllers/group_call_controller.dart';
 import 'group_info_screen.dart';
 import 'model/message_model.dart';
+
 
 class GroupChatScreen extends StatelessWidget {
   GroupChatScreen({super.key});
@@ -15,9 +15,15 @@ class GroupChatScreen extends StatelessWidget {
     ChatMessage(text: "Cool, I'll add a few more ideas.", isMe: false, sender: "Nafiz"),
   ];
 
+  final String groupId = Get.arguments['groupId'] ?? 'unknown_group';
+  final String groupName = Get.arguments['groupName'] ?? 'Unnamed Group';
+
+  final GroupCallController callController = Get.put(GroupCallController());
 
   @override
   Widget build(BuildContext context) {
+    callController.listenToCallStatus(groupId);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: PreferredSize(
@@ -34,16 +40,18 @@ class GroupChatScreen extends StatelessWidget {
                 const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('Sample Name',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  children: [
+                    Text(groupName, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     Text('14 members', style: TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
                 const Spacer(),
-                const Icon(Icons.videocam, color: Colors.white),
+                IconButton(
+                  icon: const Icon(Icons.videocam, color: Colors.white),
+                  onPressed: () => callController.startCall(groupId), // Start call here
+                ),
                 const SizedBox(width: 12),
-                const Icon(Icons.call, color: Colors.white),
+                const Icon(Icons.call, color: Colors.white), // Keep call icon static
                 const SizedBox(width: 12),
                 const Icon(Icons.description, color: Colors.white),
                 const SizedBox(width: 12),
@@ -53,7 +61,6 @@ class GroupChatScreen extends StatelessWidget {
                     Get.to(() => const GroupInfoScreen());
                   },
                 ),
-
               ],
             ),
           ),
@@ -61,6 +68,27 @@ class GroupChatScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
+          Obx(() {
+            if (!callController.isCallActive.value) return SizedBox.shrink();
+            return Container(
+              color: Colors.green[100],
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.call, color: Colors.green),
+                  const SizedBox(width: 8),
+                  const Text("A call is in progress"),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => callController.joinCall(groupId),
+                    child: const Text("Join"),
+                  ),
+                ],
+              ),
+            );
+          }),
+
           // Photo/Preview Area
           Stack(
             children: [
@@ -79,7 +107,6 @@ class GroupChatScreen extends StatelessWidget {
             ],
           ),
 
-
           const SizedBox(height: 24),
 
           // Chat Area
@@ -89,14 +116,9 @@ class GroupChatScreen extends StatelessWidget {
               itemCount: messages.length,
               itemBuilder: (context, index) {
                 final message = messages[index];
-
-                // 🧍 Show both your name and others' name
                 final String displayName = message.isMe ? "You" : (message.sender ?? "Unknown");
 
-
-
                 if (message.isMe) {
-                  // ✅ Outgoing message (user)
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -117,11 +139,10 @@ class GroupChatScreen extends StatelessWidget {
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.all(12),
                           constraints: const BoxConstraints(maxWidth: 280),
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: Colors.black,
                             borderRadius: BorderRadius.only(
                               topLeft: Radius.circular(12),
-                              topRight: Radius.circular(0),
                               bottomLeft: Radius.circular(12),
                               bottomRight: Radius.circular(12),
                             ),
@@ -136,7 +157,6 @@ class GroupChatScreen extends StatelessWidget {
                     ],
                   );
                 } else {
-                  // ✅ Incoming message (other user)
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Row(
@@ -153,7 +173,6 @@ class GroupChatScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (displayName.isNotEmpty)
-
                                 Padding(
                                   padding: const EdgeInsets.only(bottom: 4),
                                   child: Text(
@@ -171,7 +190,6 @@ class GroupChatScreen extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   color: Colors.grey.shade200,
                                   borderRadius: const BorderRadius.only(
-                                    topLeft: Radius.circular(0),
                                     topRight: Radius.circular(12),
                                     bottomLeft: Radius.circular(12),
                                     bottomRight: Radius.circular(12),
@@ -179,10 +197,7 @@ class GroupChatScreen extends StatelessWidget {
                                 ),
                                 child: Text(
                                   message.text,
-                                  style: const TextStyle(
-                                    color: Colors.black87,
-                                    height: 1.4,
-                                  ),
+                                  style: const TextStyle(color: Colors.black87, height: 1.4),
                                   textAlign: TextAlign.left,
                                 ),
                               ),
@@ -197,9 +212,6 @@ class GroupChatScreen extends StatelessWidget {
             ),
           ),
 
-
-
-
           // Message input
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -212,7 +224,6 @@ class GroupChatScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 🔹 TextField
                 const TextField(
                   decoration: InputDecoration(
                     hintText: 'Type your message...',
@@ -221,13 +232,8 @@ class GroupChatScreen extends StatelessWidget {
                   ),
                   style: TextStyle(fontSize: 14),
                 ),
-
-                // 🔸 Divider
                 const Divider(height: 1, thickness: 1),
-
                 const SizedBox(height: 8),
-
-                // 🔻 Icon Row + Send Button
                 Row(
                   children: [
                     Icon(Icons.add_circle_outline, color: Colors.grey.shade600),
@@ -249,9 +255,7 @@ class GroupChatScreen extends StatelessWidget {
                 ),
               ],
             ),
-          )
-
-
+          ),
         ],
       ),
     );

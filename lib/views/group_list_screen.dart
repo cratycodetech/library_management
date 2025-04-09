@@ -20,10 +20,10 @@ class GroupListScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text("No groups found"));
+            return const Center(child: Text("No groups found"));
           }
 
           var groups = snapshot.data!.docs;
@@ -32,14 +32,20 @@ class GroupListScreen extends StatelessWidget {
             itemCount: groups.length,
             itemBuilder: (context, index) {
               var group = groups[index];
+              String groupId = group.id;
+              String groupName = group['name'] ?? 'Unnamed Group';
+
               return ListTile(
-                title: Text(group['name']),
-                subtitle: Text("Group ID: ${group.id}"),
+                title: Text(groupName),
+                subtitle: Text("Group ID: $groupId"),
                 onTap: () {
-                  Get.toNamed(AppRoutes.groupChat, arguments: {
-                    "groupId": group.id,
-                    "groupName": group['name'],
-                  });
+                  Get.toNamed(
+                    AppRoutes.groupChatScreen,
+                    arguments: {
+                      'groupId': groupId,
+                      'groupName': groupName,
+                    },
+                  );
                 },
               );
             },

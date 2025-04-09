@@ -50,11 +50,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
     if (groupId.isNotEmpty) {
 
-      Get.snackbar("Success", "Group created successfully!");
-      Get.offNamed(AppRoutes.groupChat, arguments: {
-        "groupId": groupId,
-        "groupName": _groupNameController.text,
-      });
+      Get.offNamed(
+        AppRoutes.groupChatScreen,
+        arguments: {
+          'groupId': groupId,
+          'groupName': _groupNameController.text.trim(),
+        },
+      );
     } else {
       Get.snackbar("Error", "Group with this name already exists.");
     }
@@ -85,29 +87,33 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 itemCount: _allUsers.length,
                 itemBuilder: (context, index) {
                   final user = _allUsers[index];
-                  bool isFile = user["isFile"] ?? false; // Assuming files have "isFile": true
+                  bool isFile = user["isFile"] ?? false;
+                  String uid = user["uid"] ?? "";
+                  String name = user["name"] ?? "Unknown";
+                  String email = user["email"] ?? "No email";
 
                   return CheckboxListTile(
                     title: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(child: Text(user["name"])), // Ensures text takes available space
-                        if (isFile) Icon(Icons.arrow_forward, color: Colors.grey), // Forward icon
+                        Expanded(child: Text(name)),
+                        if (isFile) Icon(Icons.arrow_forward, color: Colors.grey),
                       ],
                     ),
-                    subtitle: Text(user["email"]),
-                    value: _selectedUserIds.contains(user["uid"]),
+                    subtitle: Text(email),
+                    value: _selectedUserIds.contains(uid),
                     onChanged: (bool? selected) {
                       setState(() {
                         if (selected == true) {
-                          _selectedUserIds.add(user["uid"]);
+                          _selectedUserIds.add(uid);
                         } else {
-                          _selectedUserIds.remove(user["uid"]);
+                          _selectedUserIds.remove(uid);
                         }
                       });
                     },
                   );
                 },
+
               ),
             ),
             _isLoading

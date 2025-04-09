@@ -17,6 +17,7 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   RtcEngine? _engine;
   bool isJoined = false;
   List<int> remoteUsers = [];
+  String? groupName;
 
   @override
   void initState() {
@@ -25,171 +26,237 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   }
 
   Future<void> _initializeAgora() async {
-    print("🔹 Requesting camera & microphone permissions...");
     await [Permission.microphone, Permission.camera].request();
 
     if (!(await Permission.microphone.isGranted) || !(await Permission.camera.isGranted)) {
-      print("🚨 Error: Permissions not granted!");
+      print("🚨 Permissions not granted!");
       return;
     }
 
-    print("🔹 Creating Agora RTC Engine...");
     _engine = createAgoraRtcEngine();
-    await _engine?.initialize(RtcEngineContext(appId: "68cc27d382a44628a9454809677e96e6")); // Replace with your valid Agora App ID
-    print("✅ Agora Engine Initialized!");
+    await _engine?.initialize(RtcEngineContext(appId: "68cc27d382a44628a9454809677e96e6"));
 
-    print("🔹 Registering Event Handlers...");
     _engine?.registerEventHandler(RtcEngineEventHandler(
       onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-        print("✅ Successfully joined channel as a broadcaster: ${connection.channelId}");
         setState(() => isJoined = true);
       },
       onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
-        print("✅ Remote user joined: $remoteUid");
         setState(() => remoteUsers.add(remoteUid));
         _engine?.setupRemoteVideo(VideoCanvas(uid: remoteUid, renderMode: RenderModeType.renderModeHidden));
       },
       onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
-        print("🚨 User left: $remoteUid");
         setState(() => remoteUsers.remove(remoteUid));
-      },
-      onError: (ErrorCodeType error, String msg) {
-        print("🚨 Agora Error: Code $error - $msg");
       },
     ));
 
-    print("🔹 Setting Client Role to Broadcaster...");
     await _engine?.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
-
-    print("🔹 Enabling Video...");
     await _engine?.enableVideo();
     await _engine?.startPreview();
     await _engine?.setupLocalVideo(VideoCanvas(uid: 0, renderMode: RenderModeType.renderModeHidden));
-    print("✅ Video Enabled!");
 
-    print("🔹 Fetching Agora Token from Firestore...");
     String agoraToken = await _fetchTokenFromFirestore();
 
     if (agoraToken.isEmpty) {
-      print("🚨 Error: No valid Agora token found in Firestore!");
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: No valid Agora token!")));
       return;
     }
 
-    print("✅ Agora Token Retrieved: $agoraToken");
-
-    print("🔹 Joining Agora Channel as Broadcaster...");
     await _engine?.joinChannel(
       token: agoraToken,
       channelId: widget.channelName,
-      uid: DateTime.now().millisecondsSinceEpoch.remainder(100000), // Generate a unique UID
+      uid: DateTime.now().millisecondsSinceEpoch.remainder(100000),
       options: ChannelMediaOptions(
-        clientRoleType: ClientRoleType.clientRoleBroadcaster, // 🎥 Broadcast mode
-        channelProfile: ChannelProfileType.channelProfileLiveBroadcasting, // Live Broadcast Mode
+        clientRoleType: ClientRoleType.clientRoleBroadcaster,
+        channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
       ),
     );
-
-    print("✅ Successfully joined as a Broadcaster!");
   }
 
-
   Future<String> _fetchTokenFromFirestore() async {
-    DocumentSnapshot snapshot = await FirebaseFirestore.instance.collection('groups').doc(widget.channelName).get();
-    return snapshot.exists ? snapshot['callToken'] ?? '' : '';
+    DocumentSnapshot snapshot = await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.channelName)
+        .get();
+
+    if (snapshot.exists) {
+      setState(() {
+        groupName = snapshot['name'] ?? widget.channelName;
+      });
+      return snapshot['callToken'] ?? '';
+    }
+    return '';
   }
 
   @override
   void dispose() {
     _engine?.leaveChannel();
     _engine?.release();
-
     FirebaseFirestore.instance.collection('groups').doc(widget.channelName).update({
       'isCallActive': false,
       'callToken': null,
     });
-
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Group Call")),
-      body: Stack(
-        children: [
-          _renderLocalVideo(),
-          _renderRemoteVideos(),
-          _callControls(),
-        ],
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Dynamic video layout
+            Positioned.fill(child: _buildDynamicVideoLayout()),
+
+            // Top bar with group name
+            Positioned(
+              top: 16,
+              left: 12,
+              right: 12,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Text(
+                    groupName ?? '',
+                    style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+
+            // Center info (only when no one has joined)
+            if (remoteUsers.isEmpty)
+              Positioned(
+                top: MediaQuery.of(context).size.height * 0.15,
+                left: 0,
+                right: 0,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundImage: AssetImage('assets/avatar_placeholder.png'),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      groupName ?? '',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    SizedBox(height: 4),
+                    Text("Calling...", style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              ),
+
+            // Bottom controls
+            Positioned(
+              bottom: 24,
+              left: 24,
+              right: 24,
+              child: Container(
+                height: 70,
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(40),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.videocam, color: Colors.white),
+                      onPressed: () => _engine?.disableVideo(),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.mic, color: Colors.white),
+                      onPressed: () => _engine?.enableAudio(),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.screen_share, color: Colors.white),
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.cameraswitch, color: Colors.white),
+                      onPressed: () => _engine?.switchCamera(),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.call_end, color: Colors.redAccent),
+                      onPressed: () {
+                        _engine?.leaveChannel();
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _renderLocalVideo() {
-    return Positioned(
-      top: 10,
-      right: 10,
-      width: 120,
-      height: 160,
-      child: _engine == null
-          ? Center(child: Text("Initializing video..."))
-          : AgoraVideoView(
+  Widget _buildDynamicVideoLayout() {
+    const int maxTiles = 6;
+    List<Widget> tiles = [];
+
+    // Local video
+    tiles.add(
+      AgoraVideoView(
         controller: VideoViewController(
           rtcEngine: _engine!,
           canvas: VideoCanvas(uid: 0, renderMode: RenderModeType.renderModeHidden),
         ),
       ),
     );
-  }
 
-  Widget _renderRemoteVideos() {
-    if (_engine == null || remoteUsers.isEmpty) {
-      return Center(child: Text("Waiting for remote users..."));
-    }
+    // Remote users (limit to 5 others)
+    int remoteToShow = remoteUsers.length > (maxTiles - 1) ? (maxTiles - 1) : remoteUsers.length;
 
-    return GridView.builder(
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.0,
-      ),
-      itemCount: remoteUsers.length,
-      itemBuilder: (context, index) {
-        return AgoraVideoView(
+    for (int i = 0; i < remoteToShow; i++) {
+      tiles.add(
+        AgoraVideoView(
           controller: VideoViewController.remote(
             rtcEngine: _engine!,
-            canvas: VideoCanvas(uid: remoteUsers[index], renderMode: RenderModeType.renderModeHidden),
+            canvas: VideoCanvas(uid: remoteUsers[i], renderMode: RenderModeType.renderModeHidden),
             connection: RtcConnection(channelId: widget.channelName),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    }
 
-  Widget _callControls() {
-    return Positioned(
-      bottom: 20,
-      left: 20,
-      right: 20,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          FloatingActionButton(
-            heroTag: "switchCamera",
-            onPressed: () => _engine?.switchCamera(),
-            child: Icon(Icons.switch_camera),
+    // More than 6 users: show "+" icon
+    if ((remoteUsers.length + 1) > maxTiles) {
+      tiles.add(
+        Container(
+          color: Colors.black87,
+          child: Center(
+            child: Icon(Icons.add, color: Colors.white, size: 36),
           ),
-          SizedBox(width: 20),
-          FloatingActionButton(
-            heroTag: "endCall",
-            onPressed: () {
-              _engine?.leaveChannel();
-              Navigator.pop(context);
-            },
-            backgroundColor: Colors.red,
-            child: Icon(Icons.call_end),
-          ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    int total = tiles.length;
+    int crossAxisCount;
+    if (total == 1) {
+      return tiles.first;
+    } else if (total <= 2) {
+      crossAxisCount = 1;
+    } else if (total <= 4) {
+      crossAxisCount = 2;
+    } else {
+      crossAxisCount = 3;
+    }
+
+    return GridView.count(
+      crossAxisCount: crossAxisCount,
+      childAspectRatio: 9 / 16,
+      physics: NeverScrollableScrollPhysics(),
+      children: tiles,
     );
   }
 }
