@@ -40,7 +40,7 @@ class GroupListScreen extends StatelessWidget {
                 subtitle: Text("Group ID: $groupId"),
                 onTap: () {
                   Get.toNamed(
-                    AppRoutes.groupChatScreen,
+                    AppRoutes.groupChat,
                     arguments: {
                       'groupId': groupId,
                       'groupName': groupName,

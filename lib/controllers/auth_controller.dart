@@ -74,7 +74,7 @@ class AuthController extends GetxController {
       if (user != null) {
         await _saveUserToFirestore(user);
         await fetchUserDetails(); // Ensure user details are fetched immediately
-        Get.toNamed(AppRoutes.home);
+        Get.toNamed(AppRoutes.libraryHomeScreen);
       }
     } catch (e) {
       SnackbarService.showError("Google Sign-In Failed: ${e.toString()}");

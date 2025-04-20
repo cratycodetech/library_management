@@ -27,7 +27,7 @@ import '../views/one_to_one_call_screen.dart';
 import '../views/one_to_one_chat_screen.dart';
 import '../views/posting_screen.dart';
 import '../views/posts_screen.dart';
-import '../views/study_room/group_chat_screen.dart';
+
 import '../views/video_download_screen.dart';
 import '../views/group_call_screen.dart';
 import '../views/group_chat_screen.dart';
@@ -136,12 +136,13 @@ class AppRoutes {
           videoUrl: args['videoUrl'] ?? 'https://example.com/default_video.mp4',
           thumbnailGenerator: args['thumbnailGenerator'] ??
                   (String url) async {
-
                 return null;
               },
+          senderName: args['senderName'] ?? 'Unknown Sender', // 🆕 Added
         );
       },
     ),
+
 
     GetPage(
       name: photoDownload,
@@ -267,15 +268,30 @@ class AppRoutes {
       page: () => const VideoChapterScreen(),
     ),
 
+    // GetPage(
+    //   name: groupChatScreen,
+    //   page: () => GroupChatScreen(),
+    // ),
+
     GetPage(
-      name: groupChatScreen,
-      page: () => GroupChatScreen(),
+      name: groupChat,
+      page: () {
+        final args = Get.arguments as Map<String, dynamic>? ?? {};
+        return GroupChatScreen(
+          groupId: args["groupId"] ?? "",
+          groupName: args["groupName"] ?? "Unknown Group",
+        );
+      },
     ),
 
     GetPage(
       name: groupInfoScreen,
-      page: () => GroupInfoScreen(),
+      page: () {
+        final args = Get.arguments as Map<String, dynamic>? ?? {};
+        return GroupInfoScreen(groupId: args["groupId"] ?? "");
+      },
     ),
+
 
 
   ];

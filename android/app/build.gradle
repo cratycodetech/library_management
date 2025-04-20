@@ -11,13 +11,13 @@ android {
     ndkVersion "28.0.13004108"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
         coreLibraryDesugaringEnabled = true // ✅ This line is required
     }
 
     kotlinOptions {
-        jvmTarget = "11" // ✅ Should be string, not JavaVersion constant
+        jvmTarget = "1.8" // ✅ Should be string, not JavaVersion constant
     }
 
     defaultConfig {

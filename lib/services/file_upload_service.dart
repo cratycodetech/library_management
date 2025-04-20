@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -187,6 +189,7 @@ class FileUploadService {
       return null;
     }
   }
+
 
 
 

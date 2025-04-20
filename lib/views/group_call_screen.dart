@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -7,7 +10,9 @@ class GroupCallScreen extends StatefulWidget {
   final String channelName;
   final String token;
 
-  GroupCallScreen({required this.channelName, required this.token});
+  final bool withVideo;
+  const GroupCallScreen({super.key, required this.channelName, required this.token, this.withVideo = true});
+
 
   @override
   _GroupCallScreenState createState() => _GroupCallScreenState();
@@ -18,10 +23,25 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   bool isJoined = false;
   List<int> remoteUsers = [];
   String? groupName;
+  String participantId = '';
+  bool isMuted = false;
+  bool isMutedVideo = false;
+  Map<int, bool> remoteUserVideoMuted = {};
+  Map<int, String> remoteUserPhotos = {};
+
+  final user = FirebaseAuth.instance.currentUser!;
+  late final int agoraUid;
+  int? activeSpeakerUid;
+  Timer? _activeSpeakerResetTimer;
 
   @override
   void initState() {
     super.initState();
+    agoraUid = user.uid.hashCode;
+    participantId = DateTime.now().millisecondsSinceEpoch.toString();
+    if (!widget.withVideo) {
+      isMutedVideo = true;
+    }
     _initializeAgora();
   }
 
@@ -37,22 +57,71 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
     await _engine?.initialize(RtcEngineContext(appId: "68cc27d382a44628a9454809677e96e6"));
 
     _engine?.registerEventHandler(RtcEngineEventHandler(
-      onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+      onJoinChannelSuccess: (RtcConnection connection, int elapsed) async {
         setState(() => isJoined = true);
+        await _addSelfToParticipants();
       },
-      onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
+      onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) async {
         setState(() => remoteUsers.add(remoteUid));
-        _engine?.setupRemoteVideo(VideoCanvas(uid: remoteUid, renderMode: RenderModeType.renderModeHidden));
+
+        DocumentSnapshot mappingDoc = await FirebaseFirestore.instance
+            .collection('agoraUsers')
+            .doc(remoteUid.toString())
+            .get();
+
+        if (mappingDoc.exists) {
+          String firebaseUid = mappingDoc['firebaseUid'];
+
+          DocumentSnapshot userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(firebaseUid)
+              .get();
+
+          if (userDoc.exists && userDoc['photoURL'] != null) {
+            setState(() {
+              remoteUserPhotos[remoteUid] = userDoc['photoURL'];
+            });
+          }
+        }
       },
       onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
         setState(() => remoteUsers.remove(remoteUid));
       },
+      onUserMuteVideo: (RtcConnection connection, int remoteUid, bool muted) {
+        setState(() {
+          remoteUserVideoMuted[remoteUid] = muted;
+        });
+      },
+      onActiveSpeaker: (RtcConnection connection, int uid) {
+        _activeSpeakerResetTimer?.cancel(); // cancel previous timer
+
+        setState(() {
+          activeSpeakerUid = uid;
+        });
+
+        // Set a timeout to clear the active speaker after 2 seconds
+        _activeSpeakerResetTimer = Timer(Duration(seconds: 2), () {
+          if (mounted) {
+            setState(() {
+              activeSpeakerUid = null;
+            });
+          }
+        });
+      },
+
     ));
 
+    if (widget.withVideo) {
+      await _engine?.enableVideo();
+      await _engine?.startPreview();
+      await _engine?.setupLocalVideo(
+        VideoCanvas(uid: 0, renderMode: RenderModeType.renderModeHidden),
+      );
+    } else {
+      await _engine?.disableVideo();
+    }
+
     await _engine?.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
-    await _engine?.enableVideo();
-    await _engine?.startPreview();
-    await _engine?.setupLocalVideo(VideoCanvas(uid: 0, renderMode: RenderModeType.renderModeHidden));
 
     String agoraToken = await _fetchTokenFromFirestore();
 
@@ -61,15 +130,51 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
       return;
     }
 
+    await FirebaseFirestore.instance.collection('agoraUsers').doc(agoraUid.toString()).set({
+      'firebaseUid': user.uid,
+    });
+
     await _engine?.joinChannel(
       token: agoraToken,
       channelId: widget.channelName,
-      uid: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      uid: agoraUid,
       options: ChannelMediaOptions(
         clientRoleType: ClientRoleType.clientRoleBroadcaster,
         channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
       ),
     );
+  }
+
+  Future<void> _addSelfToParticipants() async {
+    await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.channelName)
+        .collection('participants')
+        .doc(participantId)
+        .set({'joinedAt': Timestamp.now()});
+  }
+
+  Future<void> _removeSelfAndCheckParticipants() async {
+    final docRef = FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.channelName)
+        .collection('participants')
+        .doc(participantId);
+
+    await docRef.delete();
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.channelName)
+        .collection('participants')
+        .get();
+
+    if (snapshot.docs.isEmpty) {
+      await FirebaseFirestore.instance.collection('groups').doc(widget.channelName).update({
+        'isCallActive': false,
+        'callToken': null,
+      });
+    }
   }
 
   Future<String> _fetchTokenFromFirestore() async {
@@ -89,26 +194,28 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
 
   @override
   void dispose() {
+    _activeSpeakerResetTimer?.cancel();
     _engine?.leaveChannel();
     _engine?.release();
-    FirebaseFirestore.instance.collection('groups').doc(widget.channelName).update({
-      'isCallActive': false,
-      'callToken': null,
-    });
+    _removeSelfAndCheckParticipants();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_engine == null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
           children: [
-            // Dynamic video layout
             Positioned.fill(child: _buildDynamicVideoLayout()),
-
-            // Top bar with group name
             Positioned(
               top: 16,
               left: 12,
@@ -126,8 +233,6 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                 ],
               ),
             ),
-
-            // Center info (only when no one has joined)
             if (remoteUsers.isEmpty)
               Positioned(
                 top: MediaQuery.of(context).size.height * 0.15,
@@ -150,8 +255,6 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                   ],
                 ),
               ),
-
-            // Bottom controls
             Positioned(
               bottom: 24,
               left: 24,
@@ -167,12 +270,35 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.videocam, color: Colors.white),
-                      onPressed: () => _engine?.disableVideo(),
+                      icon: Icon(
+                        isMutedVideo ? Icons.videocam_off : Icons.videocam,
+                        color: Colors.white,
+                      ),
+                      onPressed: () async {
+                        setState(() {
+                          isMutedVideo = !isMutedVideo;
+                        });
+
+                        if (!isMutedVideo) {
+                          // If video is being turned ON
+                          await _engine?.enableVideo();
+                          await _engine?.setupLocalVideo(
+                            VideoCanvas(uid: 0, renderMode: RenderModeType.renderModeHidden),
+                          );
+                        } else {
+                          // If video is being turned OFF
+                          await _engine?.disableVideo();
+                        }
+                      },
                     ),
                     IconButton(
-                      icon: Icon(Icons.mic, color: Colors.white),
-                      onPressed: () => _engine?.enableAudio(),
+                      icon: Icon(isMuted ? Icons.mic_off : Icons.mic, color: Colors.white),
+                      onPressed: () {
+                        setState(() {
+                          isMuted = !isMuted;
+                        });
+                        _engine?.muteLocalAudioStream(isMuted);
+                      },
                     ),
                     IconButton(
                       icon: Icon(Icons.screen_share, color: Colors.white),
@@ -200,63 +326,144 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   }
 
   Widget _buildDynamicVideoLayout() {
-    const int maxTiles = 6;
     List<Widget> tiles = [];
 
-    // Local video
-    tiles.add(
-      AgoraVideoView(
+    tiles.add(_videoTile(
+      isMutedVideo
+          ? _profilePlaceholder(user.photoURL)
+          : AgoraVideoView(
         controller: VideoViewController(
           rtcEngine: _engine!,
           canvas: VideoCanvas(uid: 0, renderMode: RenderModeType.renderModeHidden),
         ),
       ),
-    );
+      isSpeaking: activeSpeakerUid == 0 && !isMuted,
+    ));
 
-    // Remote users (limit to 5 others)
-    int remoteToShow = remoteUsers.length > (maxTiles - 1) ? (maxTiles - 1) : remoteUsers.length;
 
-    for (int i = 0; i < remoteToShow; i++) {
-      tiles.add(
-        AgoraVideoView(
+    for (int uid in remoteUsers) {
+      bool isMuted = remoteUserVideoMuted[uid] ?? false;
+
+      tiles.add(_videoTile(
+        isMuted
+            ? _profilePlaceholder(remoteUserPhotos[uid])
+            : AgoraVideoView(
           controller: VideoViewController.remote(
             rtcEngine: _engine!,
-            canvas: VideoCanvas(uid: remoteUsers[i], renderMode: RenderModeType.renderModeHidden),
+            canvas: VideoCanvas(uid: uid, renderMode: RenderModeType.renderModeHidden),
             connection: RtcConnection(channelId: widget.channelName),
           ),
         ),
-      );
+        isSpeaking: activeSpeakerUid == uid && !isMuted,
+      ));
     }
 
-    // More than 6 users: show "+" icon
-    if ((remoteUsers.length + 1) > maxTiles) {
-      tiles.add(
-        Container(
-          color: Colors.black87,
-          child: Center(
-            child: Icon(Icons.add, color: Colors.white, size: 36),
-          ),
-        ),
-      );
-    }
 
     int total = tiles.length;
-    int crossAxisCount;
-    if (total == 1) {
-      return tiles.first;
-    } else if (total <= 2) {
-      crossAxisCount = 1;
-    } else if (total <= 4) {
-      crossAxisCount = 2;
-    } else {
-      crossAxisCount = 3;
+
+    if (total == 1) return tiles[0];
+
+    if (total == 2) {
+      return Column(
+        children: tiles.map((tile) => Expanded(child: tile)).toList(),
+      );
     }
 
+    if (total == 3) {
+      return Column(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: tiles[0]),
+                Expanded(child: tiles[1]),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.6,
+                child: AspectRatio(
+                  aspectRatio: 9 / 16,
+                  child: tiles[2],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (total == 5) {
+      return Column(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: tiles[0]),
+                Expanded(child: tiles[1]),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: tiles[2]),
+                Expanded(child: tiles[3]),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.6,
+                child: AspectRatio(
+                  aspectRatio: 9 / 16,
+                  child: tiles[4],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    int crossAxisCount = total <= 4 ? 2 : 3;
     return GridView.count(
       crossAxisCount: crossAxisCount,
       childAspectRatio: 9 / 16,
       physics: NeverScrollableScrollPhysics(),
       children: tiles,
+    );
+  }
+
+  Widget _videoTile(Widget child, {bool isSpeaking = false}) {
+    return Padding(
+      padding: const EdgeInsets.all(4.0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black,
+            border: isSpeaking ? Border.all(color: Colors.greenAccent, width: 3) : null,
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _profilePlaceholder(String? photoUrl) {
+    return Container(
+      color: Colors.black,
+      alignment: Alignment.center,
+      child: CircleAvatar(
+        radius: 40,
+        backgroundImage: photoUrl != null
+            ? NetworkImage(photoUrl)
+            : AssetImage('assets/avatar_placeholder.png') as ImageProvider,
+      ),
     );
   }
 }

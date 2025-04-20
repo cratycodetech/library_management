@@ -1,13 +1,18 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:get/get_state_manager/src/simple/get_controllers.dart';
 import 'package:get_thumbnail_video/index.dart';
 import 'package:get_thumbnail_video/video_thumbnail.dart';
 import 'package:path_provider/path_provider.dart';
 
 
-class GroupService {
+class GroupService extends GetxController{
   final CollectionReference groupsCollection =
   FirebaseFirestore.instance.collection('groups');
+  List<DocumentSnapshot> messages = [];
+  DocumentSnapshot? lastMessageDoc;
+  bool hasMore = true;
+  bool isLoadingMore = false;
 
 
   Future<bool> doesGroupExist(String groupName) async {
@@ -18,7 +23,7 @@ class GroupService {
     return query.docs.isNotEmpty;
   }
 
-  Future<String> createGroup(String groupName, String adminId, List<String> memberIds) async {
+  Future<String> createGroup(String groupName, String adminId, List<String> memberIds, {String type = 'private'}) async {
     try {
       bool exists = await doesGroupExist(groupName);
       if (exists) return "";
@@ -27,6 +32,7 @@ class GroupService {
         'name': groupName,
         'adminId': adminId,
         'members': memberIds,
+        'type': type, // ✅ added group type
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -36,6 +42,7 @@ class GroupService {
       return "";
     }
   }
+
 
 
   Future<void> addUserToGroup(String groupId, String userId) async {
@@ -63,24 +70,43 @@ class GroupService {
         String? fileUrl,
         String? fileName,
         String? fileType,
-        String? localPath
+        String? localPath,
       }) async {
     try {
+      final String? photoURL = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get()
+          .then((doc) => doc['photoURL']);
+
+      DocumentSnapshot groupDoc = await groupsCollection.doc(groupId).get();
+      List<dynamic> members = groupDoc['members'];
+
+      Map<String, bool> unreadMap = {
+        for (var member in members)
+          if (member != userId) member: true
+      };
+
       await groupsCollection.doc(groupId).collection('messages').add({
         'senderId': userId,
         'senderName': userName,
+        'photoURL': await photoURL ?? '',
         'text': text.isNotEmpty ? text : null,
         'fileUrl': fileUrl,
         'fileName': fileName,
         'fileType': fileType,
         'localPaths': {userId: localPath},
         'groupId': groupId,
+        'unread': unreadMap,
         'timestamp': FieldValue.serverTimestamp(),
       });
+
+
     } catch (e) {
       print("Error sending message: $e");
     }
   }
+
 
 
   // Fetch messages for a group (real-time updates)
@@ -113,6 +139,7 @@ class GroupService {
   }
 
 
+
   Future<void> sendVoiceSMS(
       String groupId,
       String userId,
@@ -121,21 +148,82 @@ class GroupService {
       String fileName,
       ) async {
     try {
+      final DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      final String photoURL = userDoc.data() != null &&
+          (userDoc.data() as Map<String, dynamic>).containsKey('photoURL')
+          ? userDoc['photoURL']
+          : '';
+
+      DocumentSnapshot groupDoc = await groupsCollection.doc(groupId).get();
+      List<dynamic> members = groupDoc['members'];
+
+      Map<String, bool> unreadMap = {
+        for (var member in members)
+          if (member != userId) member: true
+      };
+
       await groupsCollection.doc(groupId).collection('messages').add({
         'senderId': userId,
         'senderName': userName,
+        'photoURL': photoURL,
         'fileUrl': fileUrl,
         'fileName': fileName,
         'fileType': 'm4a',
-        'text' : '',
+        'text': '',
         'groupId': groupId,
+        'unread': unreadMap, // ✅ NEW
         'timestamp': FieldValue.serverTimestamp(),
       });
+
 
       print("✅ Voice SMS sent successfully");
     } catch (e) {
       print("❌ Error sending Voice SMS: $e");
     }
+  }
+
+  Future<void> loadMoreMessages(String groupId) async {
+    if (!hasMore || isLoadingMore) return;
+    isLoadingMore = true;
+
+    Query query = FirebaseFirestore.instance
+        .collection('groups')
+        .doc(groupId)
+        .collection('messages')
+        .orderBy('timestamp', descending: true)
+        .limit(20);
+
+    if (lastMessageDoc != null) {
+      query = query.startAfterDocument(lastMessageDoc!);
+    }
+
+    final snapshot = await query.get();
+    if (snapshot.docs.isNotEmpty) {
+      messages.addAll(snapshot.docs);
+      lastMessageDoc = snapshot.docs.last;
+      update(); // GetBuilder will rebuild
+    }
+
+    if (snapshot.docs.length < 20) {
+      hasMore = false;
+    }
+
+    isLoadingMore = false;
+  }
+
+  Stream<List<DocumentSnapshot>> streamMessages(String groupId) {
+    return FirebaseFirestore.instance
+        .collection('groups')
+        .doc(groupId)
+        .collection('messages')
+        .orderBy('timestamp', descending: true)
+        .limit(20)
+        .snapshots()
+        .map((snapshot) => snapshot.docs);
   }
 
 

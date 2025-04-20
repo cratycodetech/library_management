@@ -58,6 +58,15 @@ dependencies:
   flutter_screenutil: ^5.9.3
   smooth_page_indicator: ^1.2.1
   chewie: ^1.7.0
+  audio_waveforms: ^1.0.5
+
+
+
+
+
+
+
+
 
 
 dev_dependencies:

@@ -42,10 +42,10 @@ void main() async {
     print("❌ Error loading .env file: $e");
   }
   await FirebaseService.init();
-  // await Supabase.initialize(
-  //   url: dotenv.env['SUPABASE_URL'] ?? '',
-  //   anonKey: dotenv.env['SUPABASE_ANONKEY'] ?? '',
-  // );
+  await Supabase.initialize(
+    url: dotenv.env['SUPABASE_URL'] ?? '',
+    anonKey: dotenv.env['SUPABASE_ANONKEY'] ?? '',
+  );
 
   await FlutterDownloader.initialize(
     debug: true,
@@ -69,26 +69,26 @@ void main() async {
   await Firebase.initializeApp();
   FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-  // String? fcmToken = await messaging.getToken();
-  // if (fcmToken != null) {
-  //   print("🔥 FCM Token: $fcmToken");
-  // } else {
-  //   print("❌ Failed to retrieve FCM token.");
-  // }
-  //
-  // if (fcmToken != null) {
-  //   String? fcmToken = await messaging.getToken();
-  //   if (fcmToken != null) {
-  //     try {
-  //       await NotificationRemoteService().updateFcmToken(fcmToken: fcmToken);
-  //       print("✅ FCM Token updated successfully.");
-  //     } catch (e) {
-  //       print("❌ Failed to update `FCM` token: $e");
-  //     }
-  //   } else {
-  //     print("❌ Failed to retrieve FCM token.");
-  //   }
-  // }
+  String? fcmToken = await messaging.getToken();
+  if (fcmToken != null) {
+    print("🔥 FCM Token: $fcmToken");
+  } else {
+    print("❌ Failed to retrieve FCM token.");
+  }
+
+  if (fcmToken != null) {
+    String? fcmToken = await messaging.getToken();
+    if (fcmToken != null) {
+      try {
+        await NotificationRemoteService().updateFcmToken(fcmToken: fcmToken);
+        print("✅ FCM Token updated successfully.");
+      } catch (e) {
+        print("❌ Failed to update `FCM` token: $e");
+      }
+    } else {
+      print("❌ Failed to retrieve FCM token.");
+    }
+  }
 
   runApp(
     ScreenUtilInit(

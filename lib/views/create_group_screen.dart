@@ -8,16 +8,18 @@ class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
 
   @override
-  _CreateGroupScreenState createState() => _CreateGroupScreenState();
+  State<CreateGroupScreen> createState() => _CreateGroupScreenState();
 }
 
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final TextEditingController _groupNameController = TextEditingController();
   final GroupService _groupService = GroupService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
   bool _isLoading = false;
   List<Map<String, dynamic>> _allUsers = [];
   List<String> _selectedUserIds = [];
+  String _groupType = 'private'; // default type
 
   @override
   void initState() {
@@ -25,7 +27,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     _fetchUsers();
   }
 
-  // Fetch all users to display in selection list
   void _fetchUsers() async {
     List<Map<String, dynamic>> users = await _groupService.getAllUsers();
     setState(() {
@@ -34,8 +35,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   void _createGroup() async {
-    if (_groupNameController.text.isEmpty) {
+    if (_groupNameController.text.trim().isEmpty) {
       Get.snackbar("Error", "Group name cannot be empty!");
+      return;
+    }
+
+    if (_selectedUserIds.isEmpty) {
+      Get.snackbar("Error", "Please select at least one member!");
       return;
     }
 
@@ -46,17 +52,18 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     String adminId = _auth.currentUser!.uid;
     List<String> members = [..._selectedUserIds, adminId];
 
-    String groupId = await _groupService.createGroup(_groupNameController.text, adminId, members);
+    String groupId = await _groupService.createGroup(
+      _groupNameController.text.trim(),
+      adminId,
+      members,
+      type: _groupType,
+    );
 
     if (groupId.isNotEmpty) {
-
-      Get.offNamed(
-        AppRoutes.groupChatScreen,
-        arguments: {
-          'groupId': groupId,
-          'groupName': _groupNameController.text.trim(),
-        },
-      );
+      Get.offNamed(AppRoutes.groupChat, arguments: {
+        'groupId': groupId,
+        'groupName': _groupNameController.text.trim(),
+      });
     } else {
       Get.snackbar("Error", "Group with this name already exists.");
     }
@@ -65,6 +72,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       _isLoading = false;
     });
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -79,27 +87,48 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               decoration: InputDecoration(labelText: "Group Name"),
             ),
             SizedBox(height: 20),
-            Text("Select Members:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+
+            /// Group Type Selector
+            /// Group Type Toggle
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: ToggleButtons(
+                borderRadius: BorderRadius.circular(10),
+                fillColor: Colors.black,
+                selectedColor: Colors.white,
+                color: Colors.black54,
+                constraints: BoxConstraints(minHeight: 40, minWidth: 120),
+                isSelected: [_groupType == 'private', _groupType == 'public'],
+                onPressed: (index) {
+                  setState(() {
+                    _groupType = index == 0 ? 'private' : 'public';
+                  });
+                },
+                children: const [
+                  Text('Private Room'),
+                  Text('Public Room'),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 20),
+            Text("Select Members:",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             Expanded(
               child: _allUsers.isEmpty
                   ? Center(child: CircularProgressIndicator())
-                  :ListView.builder(
+                  : ListView.builder(
                 itemCount: _allUsers.length,
                 itemBuilder: (context, index) {
                   final user = _allUsers[index];
-                  bool isFile = user["isFile"] ?? false;
                   String uid = user["uid"] ?? "";
                   String name = user["name"] ?? "Unknown";
                   String email = user["email"] ?? "No email";
-
                   return CheckboxListTile(
-                    title: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(child: Text(name)),
-                        if (isFile) Icon(Icons.arrow_forward, color: Colors.grey),
-                      ],
-                    ),
+                    title: Text(name),
                     subtitle: Text(email),
                     value: _selectedUserIds.contains(uid),
                     onChanged: (bool? selected) {
@@ -113,7 +142,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     },
                   );
                 },
-
               ),
             ),
             _isLoading
